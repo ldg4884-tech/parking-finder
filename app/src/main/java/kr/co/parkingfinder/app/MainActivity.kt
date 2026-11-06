@@ -7,25 +7,15 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.location.Location
 import android.location.LocationManager
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
-import android.net.Uri
-import androidx.compose.foundation.Image
-import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.layout.ContentScale
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Bluetooth
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Map
@@ -36,9 +26,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
@@ -93,38 +81,8 @@ private fun ParkingFinderApp() {
     var historyItems by remember { mutableStateOf(emptyList<String>()) }
     var selectedFloor by remember { mutableStateOf(prefs.getString("selected_floor", "B1") ?: "B1") }
     val floors = listOf("B2", "B1", "1F")
-    val floorKey = "floor_plan_uri_$selectedFloor"
-    var floorPlanUri by remember(selectedFloor) {
-        mutableStateOf(prefs.getString(floorKey, if (selectedFloor == "B1") prefs.getString("floor_plan_uri", null) else null))
-    }
-    var markerX by remember(selectedFloor) { mutableFloatStateOf(prefs.getFloat("marker_x_$selectedFloor", -1f)) }
-    var markerY by remember(selectedFloor) { mutableFloatStateOf(prefs.getFloat("marker_y_$selectedFloor", -1f)) }
-    var floorPlanImage by remember(floorPlanUri) {
-        mutableStateOf(
-            try {
-                floorPlanUri?.let { savedUri ->
-                    context.contentResolver.openInputStream(Uri.parse(savedUri))?.use { stream ->
-                        BitmapFactory.decodeStream(stream)?.asImageBitmap()
-                    }
-                }
-            } catch (_: Exception) { null }
-        )
-    }
-    val floorPlanPicker = rememberLauncherForActivityResult(
-        ActivityResultContracts.OpenDocument()
-    ) { uri ->
-        if (uri != null) {
-            try {
-                context.contentResolver.takePersistableUriPermission(
-                    uri, Intent.FLAG_GRANT_READ_URI_PERMISSION
-                )
-                floorPlanUri = uri.toString()
-                prefs.edit().putString(floorKey, floorPlanUri).putString("selected_floor", selectedFloor).apply()
-                status = "$selectedFloor 도면 등록 완료"
-            } catch (_: Exception) {
-                status = "도면을 저장하지 못했습니다. 다시 선택해 주세요."
-            }
-        }
+    var selectedParkingBay by remember(selectedFloor) {
+        mutableStateOf(prefs.getString("selected_bay_$selectedFloor", "") ?: "")
     }
 
     val pillarCamera = rememberLauncherForActivityResult(
@@ -235,10 +193,10 @@ private fun ParkingFinderApp() {
                         }
                         Button(
                             onClick = {
-                                if (manualZoneLabel.isBlank()) {
-                                    status = "주차 위치나 기둥 번호를 입력해 주세요."
+                                if (manualZoneLabel.isBlank() && selectedParkingBay.isBlank()) {
+                                    status = "기둥 번호를 입력하거나 지도에서 주차면을 선택해 주세요."
                                 } else {
-                                    val zone = manualZoneLabel.trim()
+                                    val zone = listOf(manualZoneLabel.trim(), selectedParkingBay).filter { it.isNotBlank() }.joinToString(" · ")
                                     val now = System.currentTimeMillis()
                                     val time = SimpleDateFormat("yyyy.MM.dd HH:mm", Locale.KOREA).format(Date(now))
                                     val spot = "$selectedFloor $zone"
@@ -247,8 +205,8 @@ private fun ParkingFinderApp() {
                                     prefs.edit()
                                         .putString("last_detected_floor", selectedFloor)
                                         .putString("last_detected_zone", zone)
-                                        .putFloat("last_detected_marker_x", markerX)
-                                        .putFloat("last_detected_marker_y", markerY)
+                                        .putString("last_detected_bay", selectedParkingBay)
+                                        .putString("selected_bay_$selectedFloor", selectedParkingBay)
                                         .putString("last_detected_spot", spot)
                                         .putString("last_location", spot)
                                         .putString("last_time", time)
@@ -312,72 +270,32 @@ private fun ParkingFinderApp() {
                                 }, label = { Text(floor) })
                             }
                         }
-                        Box(Modifier.fillMaxWidth().weight(1f)) {
-                        Box(Modifier.fillMaxSize().pointerInput(selectedFloor, floorPlanUri) {
-                            detectTapGestures { tap ->
-                                markerX = (tap.x / size.width).coerceIn(0f, 1f)
-                                markerY = (tap.y / size.height).coerceIn(0f, 1f)
-                                prefs.edit().putFloat("marker_x_$selectedFloor", markerX)
-                                    .putFloat("marker_y_$selectedFloor", markerY).apply()
-                                status = "$selectedFloor 도면에 주차 위치를 표시했습니다."
-                            }
-                        }) {
-                            if (floorPlanImage != null) {
-                                Image(bitmap = floorPlanImage!!, contentDescription = "$selectedFloor 주차장 도면",
-                                    modifier = Modifier.fillMaxSize(), contentScale = ContentScale.FillBounds)
-                            } else ParkingPlanPreview(Modifier.fillMaxSize())
-                            if (markerX >= 0f && markerY >= 0f) {
-                                Canvas(Modifier.fillMaxSize()) {
-                                    val center = Offset(size.width * markerX, size.height * markerY)
-                                    drawCircle(Color(0xFF75D5C2).copy(alpha = 0.28f), 24.dp.toPx(), center)
-                                    drawCircle(Color(0xFF75D5C2), 9.dp.toPx(), center)
-                                    drawCircle(Color.White, 3.dp.toPx(), center)
-                                }
-                            }
-                        }
-                        Column(Modifier.align(Alignment.TopStart).padding(8.dp)) {
-                            Text("$selectedFloor 주차장 도면", fontWeight = FontWeight.Bold)
-                            Text(
-                                if (floorPlanImage != null) "등록된 도면 · 눌러서 위치 지정" else "간이 지도 · 도면 없이도 위치 저장 가능",
-                                color = Color(0xFF9BAABD), style = MaterialTheme.typography.labelSmall
-                            )
-                        }
-                        Column(Modifier.align(Alignment.BottomCenter).padding(10.dp)) {
-                            Text(if (markerX >= 0f && markerY >= 0f) "도면에 지정한 위치가 표시되어 있습니다."
-                                else "도면을 눌러 주차 위치를 직접 표시할 수 있습니다.",
-                                color = Color(0xFF9BAABD), style = MaterialTheme.typography.bodySmall)
-                            if (hasLocation) Text(locationText, color = Color(0xFF9BAABD), style = MaterialTheme.typography.labelSmall)
-                            if (savedAt.isNotBlank()) Text(savedAt, color = Color(0xFF75D5C2),
-                                style = MaterialTheme.typography.labelSmall)
-                            if (markerX >= 0f && markerY >= 0f) {
-                                TextButton(onClick = {
-                                    markerX = -1f
-                                    markerY = -1f
-                                    prefs.edit().remove("marker_x_$selectedFloor")
-                                        .remove("marker_y_$selectedFloor").apply()
-                                    status = "$selectedFloor 도면의 위치 표시를 지웠습니다."
-                                }) { Text("위치 표시 지우기") }
-                            }
-                        }
-                    }
+                        AisleParkingMap(
+                            selectedBay = selectedParkingBay,
+                            onSelect = { bay ->
+                                selectedParkingBay = bay
+                                prefs.edit().putString("selected_bay_$selectedFloor", bay).apply()
+                                status = "$selectedFloor $bay 위치 선택됨"
+                            },
+                            modifier = Modifier.fillMaxWidth().height(300.dp)
+                        )
+                        Text(
+                            if (selectedParkingBay.isBlank()) "통로 양쪽의 주차면을 선택하세요."
+                            else "선택 위치: $selectedFloor · $selectedParkingBay",
+                            color = Color(0xFF75D5C2),
+                            style = MaterialTheme.typography.bodySmall
+                        )
                     }
                 }
-                Text("층과 기둥 번호를 입력해 저장하세요. 도면이 있으면 눌러서 위치도 함께 표시할 수 있습니다.",
+                Text("통로 양쪽 주차면을 선택하고 기둥 번호를 직접 입력하거나 카메라로 인식해 저장하세요.",
                     color = Color(0xFF8291A5), style = MaterialTheme.typography.labelSmall)
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    OutlinedButton(onClick = { floorPlanPicker.launch(arrayOf("image/*")) },
-                        modifier = Modifier.weight(1f)) {
-                        Icon(Icons.Default.Add, null); Text(" 도면 등록")
-                    }
-                    OutlinedButton(onClick = {
-                        historyItems = (prefs.getStringSet("parking_history", emptySet()) ?: emptySet()).toList().sortedDescending()
-                        showHistory = true
-                    },
-                        modifier = Modifier.weight(1f)) {
-                        Icon(Icons.Default.Map, null); Text(" 주차 기록")
-                    }
+                OutlinedButton(onClick = {
+                    historyItems = (prefs.getStringSet("parking_history", emptySet()) ?: emptySet()).toList().sortedDescending()
+                    showHistory = true
+                }, modifier = Modifier.fillMaxWidth()) {
+                    Icon(Icons.Default.Map, null); Text(" 주차 기록")
                 }
-                Text("차량 블루투스 연결 해제는 주차 시점을 감지합니다. 기둥 번호는 직접 입력해 저장하며, 실제 주차면 자동 인식에는 별도 실내 측위가 필요합니다.",
+                Text("차량 블루투스 연결 해제는 주차 시점을 감지합니다. 주차면은 통로형 지도에서 선택하고 기둥 번호는 직접 입력하거나 OCR로 읽어 저장합니다.",
                     color = Color(0xFF8291A5), style = MaterialTheme.typography.labelSmall)
             }
         }
@@ -429,6 +347,66 @@ private fun ParkingFinderApp() {
     }
 }
 
+
+@Composable
+private fun AisleParkingMap(
+    selectedBay: String,
+    onSelect: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text("주차 통로", color = Color(0xFF9BAABD), style = MaterialTheme.typography.labelSmall)
+        (1..6).forEach { number ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                ParkingBay("L-${number.toString().padStart(2, '0')}", selectedBay, onSelect, Modifier.weight(1f))
+                Surface(
+                    modifier = Modifier.weight(1.15f).height(42.dp),
+                    color = Color(0xFF24364A),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Text("차량 통로", color = Color(0xFF9BAABD), style = MaterialTheme.typography.labelSmall)
+                    }
+                }
+                ParkingBay("R-${number.toString().padStart(2, '0')}", selectedBay, onSelect, Modifier.weight(1f))
+            }
+        }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text("좌측 주차면", color = Color(0xFF9BAABD), style = MaterialTheme.typography.labelSmall)
+            Text("우측 주차면", color = Color(0xFF9BAABD), style = MaterialTheme.typography.labelSmall)
+        }
+    }
+}
+
+@Composable
+private fun ParkingBay(
+    bay: String,
+    selectedBay: String,
+    onSelect: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val selected = bay == selectedBay
+    Surface(
+        onClick = { onSelect(bay) },
+        modifier = modifier.height(42.dp),
+        color = if (selected) Color(0xFF24564D) else Color(0xFF24364A),
+        contentColor = if (selected) Color(0xFF9CE8D8) else Color(0xFFE6EDF5),
+        shape = RoundedCornerShape(8.dp),
+        border = androidx.compose.foundation.BorderStroke(
+            1.dp, if (selected) Color(0xFF75D5C2) else Color(0xFF40536A)
+        )
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
+            Text(if (selected) "🚗 " else "▱ ", style = MaterialTheme.typography.labelMedium)
+            Text(bay, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
+        }
+    }
+}
+
 private fun getPairedDevices(): List<BluetoothDevice> {
     return try {
         BluetoothAdapter.getDefaultAdapter()?.bondedDevices?.toList()?.sortedBy {
@@ -454,23 +432,3 @@ private fun captureLocation(context: android.content.Context, result: (String, S
     } else result("최근 위치 정보가 없습니다.", "", "위치 정보를 가져오지 못했습니다. 위치 권한과 GPS를 확인해 주세요.")
 }
 
-@Composable
-private fun ParkingPlanPreview(modifier: Modifier = Modifier) {
-    Canvas(modifier) {
-        val w = size.width; val h = size.height
-        val line = Color(0xFF40536A)
-        for (i in 0..5) {
-            val y = h * (0.28f + i * 0.105f)
-            drawLine(line, Offset(w * 0.08f, y), Offset(w * 0.92f, y), 2.dp.toPx())
-        }
-        for (i in 0..7) {
-            val x = w * (0.08f + i * 0.12f)
-            drawLine(line, Offset(x, h * 0.24f), Offset(x, h * 0.82f), 2.dp.toPx())
-        }
-        drawRoundRect(Color(0xFF24364A), topLeft = Offset(w * 0.12f, h * 0.38f),
-            size = androidx.compose.ui.geometry.Size(w * 0.76f, h * 0.22f),
-            style = Stroke(width = 2.dp.toPx()))
-        drawCircle(Color(0xFF75D5C2).copy(alpha = 0.18f), w * 0.09f, Offset(w * 0.5f, h * 0.49f))
-        drawCircle(Color(0xFF75D5C2), w * 0.035f, Offset(w * 0.5f, h * 0.49f))
-    }
-}
