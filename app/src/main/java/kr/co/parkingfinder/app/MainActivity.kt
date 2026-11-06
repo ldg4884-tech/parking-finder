@@ -171,10 +171,23 @@ private fun ParkingFinderApp() {
                         }
                         SectionedParkingMap(
                             selectedBay = selectedParkingBay,
+                            facilityByZone = listOf("A", "B", "C", "D").associateWith {
+                                prefs.getString("facility_\${selectedFloor}_$it", "없음") ?: "없음"
+                            },
+                            pillarsByZone = listOf("A", "B", "C", "D").associateWith {
+                                prefs.getString("pillars_\${selectedFloor}_$it", "") ?: ""
+                            },
                             onSelect = { bay ->
                                 selectedParkingBay = bay
                                 prefs.edit().putString("selected_bay_$selectedFloor", bay).apply()
                                 status = "$selectedFloor $bay 위치 선택됨"
+                            },
+                            onFacilityChange = { zone, facility ->
+                                prefs.edit().putString("facility_\${selectedFloor}_$zone", facility).apply()
+                                status = "$zone 구역 시설 위치 저장"
+                            },
+                            onPillarChange = { zone, pillar ->
+                                prefs.edit().putString("pillars_\${selectedFloor}_$zone", pillar).apply()
                             },
                             modifier = Modifier.fillMaxWidth()
                         )
@@ -353,38 +366,36 @@ private fun ParkingFinderApp() {
 @Composable
 private fun SectionedParkingMap(
     selectedBay: String,
+    facilityByZone: Map<String, String>,
+    pillarsByZone: Map<String, String>,
     onSelect: (String) -> Unit,
+    onFacilityChange: (String, String) -> Unit,
+    onPillarChange: (String, String) -> Unit,
     modifier: Modifier = Modifier
 ) {
     Column(modifier, verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Row(
-            Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically) {
             Text("구역별 주차 배치도", fontWeight = FontWeight.Bold, color = Color.White)
-            Text("개념 배치 · 실제 구조와 다를 수 있음",
-                color = Color(0xFFFFC978), style = MaterialTheme.typography.labelSmall)
+            Text("편집 가능한 개념도", color = Color(0xFFFFC978),
+                style = MaterialTheme.typography.labelSmall)
         }
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            listOf("🛗 엘리베이터", "🚪 출입구", "↗ 램프", "▦ 기둥").forEach { label ->
-                Surface(color = Color(0xFF24364A), shape = RoundedCornerShape(8.dp)) {
-                    Text(label, Modifier.padding(horizontal = 7.dp, vertical = 7.dp),
-                        color = Color(0xFFD8E2ED), style = MaterialTheme.typography.labelSmall)
-                }
+        Text("층별 A~D 구역의 시설 위치와 기둥 번호를 설정할 수 있습니다.",
+            color = Color(0xFF9BAABD), style = MaterialTheme.typography.bodySmall)
+        listOf("A", "B", "C", "D").forEach { zone ->
+            var expanded by remember(zone) { mutableStateOf(false) }
+            var pillarText by remember(zone, pillarsByZone[zone]) {
+                mutableStateOf(pillarsByZone[zone] ?: "")
             }
-        }
-        listOf("A", "B", "C", "D").forEachIndexed { index, zone ->
-            Card(
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF1D2D40)),
-                shape = RoundedCornerShape(14.dp)
-            ) {
+            Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF1D2D40)),
+                shape = RoundedCornerShape(14.dp)) {
                 Column(Modifier.fillMaxWidth().padding(10.dp),
                     verticalArrangement = Arrangement.spacedBy(7.dp)) {
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically) {
                         Text("$zone 구역", color = Color(0xFF75D5C2), fontWeight = FontWeight.Bold)
-                        Text("기둥 \${index * 10 + 1} · \${index * 10 + 2}",
-                            color = Color(0xFF9BAABD), style = MaterialTheme.typography.labelSmall)
+                        Text("시설: \${facilityByZone[zone] ?: "없음"}",
+                            color = Color(0xFFD8E2ED), style = MaterialTheme.typography.labelSmall)
                     }
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
                         (1..3).forEach { number ->
@@ -392,10 +403,8 @@ private fun SectionedParkingMap(
                                 selectedBay, onSelect, Modifier.weight(1f))
                         }
                     }
-                    Surface(
-                        Modifier.fillMaxWidth().height(28.dp),
-                        color = Color(0xFF30445A), shape = RoundedCornerShape(6.dp)
-                    ) {
+                    Surface(Modifier.fillMaxWidth().height(28.dp),
+                        color = Color(0xFF30445A), shape = RoundedCornerShape(6.dp)) {
                         Box(contentAlignment = Alignment.Center) {
                             Text("차량 통로", color = Color(0xFFB6C4D3),
                                 style = MaterialTheme.typography.labelSmall)
@@ -407,21 +416,33 @@ private fun SectionedParkingMap(
                                 selectedBay, onSelect, Modifier.weight(1f))
                         }
                     }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        OutlinedButton(onClick = { expanded = true }) { Text("시설 위치 설정") }
+                        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                            listOf("없음", "엘리베이터", "출입구", "램프").forEach { facility ->
+                                DropdownMenuItem(text = { Text(facility) }, onClick = {
+                                    onFacilityChange(zone, facility)
+                                    expanded = false
+                                })
+                            }
+                        }
+                        Spacer(Modifier.width(8.dp))
+                        Text("이 구역에 시설 배치", color = Color(0xFF9BAABD),
+                            style = MaterialTheme.typography.labelSmall)
+                    }
+                    OutlinedTextField(value = pillarText, onValueChange = {
+                        pillarText = it
+                        onPillarChange(zone, it)
+                    }, modifier = Modifier.fillMaxWidth(), singleLine = true,
+                        label = { Text("기둥 번호 / 표기") },
+                        placeholder = { Text("예: 101, 102, 103") })
                 }
             }
         }
-        Surface(color = Color(0xFF26394D), shape = RoundedCornerShape(10.dp)) {
-            Column(Modifier.fillMaxWidth().padding(10.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text("공용 시설 위치", color = Color(0xFF75D5C2), fontWeight = FontWeight.SemiBold)
-                Text("엘리베이터 · 출입구 · 차량 램프",
-                    color = Color(0xFFE6EDF5), style = MaterialTheme.typography.bodySmall)
-                Text("실제 시설이 있는 구역을 확인한 뒤 위치를 확정할 수 있습니다.",
-                    color = Color(0xFF9BAABD), style = MaterialTheme.typography.labelSmall)
-            }
-        }
-        Text("주차면을 누르면 위치가 선택됩니다. A-01처럼 구역-번호로 저장됩니다.",
-            color = Color(0xFF9BAABD), style = MaterialTheme.typography.labelSmall)
+        Text("선택된 주차면: \${selectedBay.ifBlank { "없음" }}",
+            color = Color(0xFF75D5C2), style = MaterialTheme.typography.bodySmall)
+        Text("※ 현재는 임시 구역 배치입니다. 실제 통로·주차면·시설 위치를 확인해 조정해야 합니다.",
+            color = Color(0xFFFFC978), style = MaterialTheme.typography.labelSmall)
     }
 }
 
