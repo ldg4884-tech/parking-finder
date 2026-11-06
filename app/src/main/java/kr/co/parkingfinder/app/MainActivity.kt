@@ -57,6 +57,11 @@ class MainActivity : ComponentActivity() {
 private fun ParkingFinderApp() {
     val context = androidx.compose.ui.platform.LocalContext.current
     val prefs = remember { context.getSharedPreferences("parking_finder", 0) }
+    var locationText by remember { mutableStateOf(prefs.getString("last_location", "아직 저장된 주차 위치가 없습니다") ?: "") }
+    var savedAt by remember { mutableStateOf(prefs.getString("last_time", "") ?: "") }
+    var hasLocation by remember { mutableStateOf(savedAt.isNotBlank()) }
+    var status by remember { mutableStateOf(prefs.getString("monitor_status", "주차 감지 준비") ?: "") }
+    var selectedDeviceName by remember { mutableStateOf(prefs.getString("car_bt_name", "") ?: "") }
     val activity = context as? ComponentActivity
     DisposableEffect(activity) {
         val observer = LifecycleEventObserver { _, event ->
@@ -71,11 +76,6 @@ private fun ParkingFinderApp() {
         activity?.lifecycle?.addObserver(observer)
         onDispose { activity?.lifecycle?.removeObserver(observer) }
     }
-    var locationText by remember { mutableStateOf(prefs.getString("last_location", "아직 저장된 주차 위치가 없습니다") ?: "") }
-    var savedAt by remember { mutableStateOf(prefs.getString("last_time", "") ?: "") }
-    var hasLocation by remember { mutableStateOf(savedAt.isNotBlank()) }
-    var status by remember { mutableStateOf(prefs.getString("monitor_status", "주차 감지 준비") ?: "") }
-    var selectedDeviceName by remember { mutableStateOf(prefs.getString("car_bt_name", "") ?: "") }
     var showDevices by remember { mutableStateOf(false) }
     var pairedDevices by remember { mutableStateOf(emptyList<BluetoothDevice>()) }
     var showHistory by remember { mutableStateOf(false) }
