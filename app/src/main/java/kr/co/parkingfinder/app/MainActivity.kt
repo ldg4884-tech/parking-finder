@@ -470,7 +470,7 @@ private fun SectionedParkingMap(
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
                         (upperCount + 1..bayCount).forEach { number ->
                             ParkingBay("$zone-${number.toString().padStart(2, '0')}",
-                                selectedBay, onSelect, Modifier.weight(1f))
+                                selectedBay, lastSavedBay, onSelect, Modifier.weight(1f))
                         }
                     }
                     Row(verticalAlignment = Alignment.CenterVertically) {
