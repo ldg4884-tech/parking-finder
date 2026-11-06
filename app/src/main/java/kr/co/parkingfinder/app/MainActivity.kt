@@ -442,7 +442,7 @@ private fun SectionedParkingMap(
                         }
                         DropdownMenu(expanded = countExpanded, onDismissRequest = { countExpanded = false }) {
                             listOf(2, 4, 6, 8, 10, 12).forEach { count ->
-                                DropdownMenuItem(text = { Text("$count면") }, onClick = {
+                                DropdownMenuItem(text = { Text("${count}면") }, onClick = {
                                     onBayCountChange(zone, count)
                                     countExpanded = false
                                 })
