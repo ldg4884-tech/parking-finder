@@ -39,6 +39,14 @@ class CarBluetoothMonitorService : Service() {
             val address = try { device.address } catch (_: SecurityException) { return }
             val name = try { device.name ?: result.scanRecord?.deviceName ?: "이름 없는 비콘" } catch (_: SecurityException) { "BLE 비콘" }
             val prefs = getSharedPreferences("parking_finder", MODE_PRIVATE)
+            if (prefs.getString("beacon_map_$address", null) != null) {
+                val mappedRssi = prefs.getInt("latest_mapped_ble_rssi", Int.MIN_VALUE)
+                if (result.rssi > mappedRssi || System.currentTimeMillis() - prefs.getLong("latest_mapped_ble_time", 0L) > 15_000L) {
+                    prefs.edit().putString("latest_mapped_ble_address", address)
+                        .putInt("latest_mapped_ble_rssi", result.rssi)
+                        .putLong("latest_mapped_ble_time", System.currentTimeMillis()).apply()
+                }
+            }
             val previousRssi = prefs.getInt("latest_ble_rssi", Int.MIN_VALUE)
             val previousTime = prefs.getLong("latest_ble_time", 0L)
             val isBetter = result.rssi > previousRssi || System.currentTimeMillis() - previousTime > 15_000L
@@ -165,7 +173,10 @@ class CarBluetoothMonitorService : Service() {
 
     private fun saveParkingLocation() {
         val prefs = getSharedPreferences("parking_finder", MODE_PRIVATE)
-        val beaconAddress = prefs.getString("latest_ble_address", null)
+        val mappedAddressTime = prefs.getLong("latest_mapped_ble_time", 0L)
+        val mappedAddress = prefs.getString("latest_mapped_ble_address", null)
+            ?.takeIf { System.currentTimeMillis() - mappedAddressTime <= 90_000L }
+        val beaconAddress = mappedAddress ?: prefs.getString("latest_ble_address", null)
         val mapping = beaconAddress?.let { prefs.getString("beacon_map_$it", null) }
         val parts = mapping?.split("|")
         val mapped = parts != null && parts.size >= 4
