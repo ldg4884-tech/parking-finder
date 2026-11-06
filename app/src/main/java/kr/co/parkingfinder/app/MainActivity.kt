@@ -7,7 +7,8 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.location.Location
 import android.location.LocationManager
-import android.graphics.Bitmap\nimport android.graphics.BitmapFactory
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.compose.foundation.Image
 import androidx.compose.ui.graphics.asImageBitmap
@@ -25,7 +26,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Bluetooth\nimport androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.Bluetooth
+import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.MyLocation
@@ -43,7 +45,10 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import java.text.SimpleDateFormat
 import java.util.Date
-import java.util.Locale\nimport com.google.mlkit.vision.common.InputImage\nimport com.google.mlkit.vision.text.TextRecognition\nimport com.google.mlkit.vision.text.korean.KoreanTextRecognizerOptions
+import java.util.Locale
+import com.google.mlkit.vision.common.InputImage
+import com.google.mlkit.vision.text.TextRecognition
+import com.google.mlkit.vision.text.korean.KoreanTextRecognizerOptions
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -63,7 +68,8 @@ private fun ParkingFinderApp() {
     var status by remember { mutableStateOf(prefs.getString("monitor_status", "주차 감지 준비") ?: "") }
     var selectedDeviceName by remember { mutableStateOf(prefs.getString("car_bt_name", "") ?: "") }
     var bleBeaconText by remember { mutableStateOf(prefs.getString("latest_ble_beacon", "실내 비콘 신호 대기 중") ?: "실내 비콘 신호 대기 중") }
-    var manualZoneLabel by remember { mutableStateOf(prefs.getString("last_detected_zone", "") ?: "") }\n    var ocrBusy by remember { mutableStateOf(false) }
+    var manualZoneLabel by remember { mutableStateOf(prefs.getString("last_detected_zone", "") ?: "") }
+    var ocrBusy by remember { mutableStateOf(false) }
     var detectedSpotText by remember { mutableStateOf(prefs.getString("last_detected_spot", "아직 비콘으로 확인된 주차 구역이 없습니다") ?: "") }
     val activity = context as? ComponentActivity
     DisposableEffect(activity) {
