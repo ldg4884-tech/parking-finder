@@ -92,8 +92,12 @@ class CarBluetoothMonitorService : Service() {
         val status = if (ageMinutes <= 5) "차량 연결 해제 · 주차 위치 저장 완료"
             else "차량 연결 해제 · 마지막 위치 저장 (약 ${ageMinutes}분 전)"
         val text = "위도 %.5f · 경도 %.5f".format(location.latitude, location.longitude)
+        val historyEntry = "$time  |  $text"
+        val history = (prefs.getStringSet("parking_history", emptySet()) ?: emptySet()).toMutableSet()
+        history.add(historyEntry)
         prefs.edit().putString("last_location", text).putString("last_time", time)
-            .putString("monitor_status", status).apply()
+            .putString("monitor_status", status)
+            .putStringSet("parking_history", history).apply()
     }
 
     private fun createNotificationChannel() {
