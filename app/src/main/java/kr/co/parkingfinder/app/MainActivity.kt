@@ -242,6 +242,7 @@ private fun ParkingFinderApp() {
                                 style = MaterialTheme.typography.labelSmall)
                         }
                     }
+                    }
                 }
                 Text("도면을 누르면 민트색 위치 표시가 저장됩니다. 층별 도면과 위치는 각각 보관됩니다.",
                     color = Color(0xFF8291A5), style = MaterialTheme.typography.labelSmall)
