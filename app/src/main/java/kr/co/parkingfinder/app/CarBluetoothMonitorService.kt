@@ -164,22 +164,30 @@ class CarBluetoothMonitorService : Service() {
     }
 
     private fun saveParkingLocation() {
+        val prefs = getSharedPreferences("parking_finder", MODE_PRIVATE)
+        val beaconAddress = prefs.getString("latest_ble_address", null)
+        val mapping = beaconAddress?.let { prefs.getString("beacon_map_$it", null) }
+        val parts = mapping?.split("|")
+        val mapped = parts != null && parts.size >= 4
+        val floor = if (mapped) parts!![0] else ""
+        val zone = if (mapped) parts!![1] else ""
+        val markerX = if (mapped) parts!![2].toFloatOrNull() ?: -1f else -1f
+        val markerY = if (mapped) parts!![3].toFloatOrNull() ?: -1f else -1f
+        val spotText = if (mapped) "$floor $zone" else "비콘 미등록 · GPS 위치만 기록"
+
         val fine = checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
         val coarse = checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
-        if (!fine && !coarse) {
-            getSharedPreferences("parking_finder", MODE_PRIVATE).edit()
-                .putString("monitor_status", "블루투스 연결 해제 감지 · 위치 권한 필요").apply()
-            return
-        }
-        val prefs = getSharedPreferences("parking_finder", MODE_PRIVATE)
         val manager = getSystemService(LocationManager::class.java)
-        val candidates = try {
-            listOfNotNull(
-                manager.getLastKnownLocation(LocationManager.GPS_PROVIDER),
-                manager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER),
-                manager.getLastKnownLocation(LocationManager.PASSIVE_PROVIDER)
-            ).toMutableList()
-        } catch (_: SecurityException) { mutableListOf<Location>() }
+        val candidates = if (fine || coarse) {
+            try {
+                listOfNotNull(
+                    manager.getLastKnownLocation(LocationManager.GPS_PROVIDER),
+                    manager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER),
+                    manager.getLastKnownLocation(LocationManager.PASSIVE_PROVIDER)
+                ).toMutableList()
+            } catch (_: SecurityException) { mutableListOf<Location>() }
+        } else mutableListOf<Location>()
+
         val cachedLat = prefs.getString("latest_latitude", null)?.toDoubleOrNull()
         val cachedLon = prefs.getString("latest_longitude", null)?.toDoubleOrNull()
         val cachedTime = prefs.getLong("latest_location_time", 0L)
@@ -192,22 +200,50 @@ class CarBluetoothMonitorService : Service() {
             })
         }
         val location = candidates.maxByOrNull { it.time }
+        val now = System.currentTimeMillis()
+        val recordedTime = if (location != null) location.time else now
+        val time = SimpleDateFormat("yyyy.MM.dd HH:mm", Locale.KOREA).format(Date(recordedTime))
+        val history = (prefs.getStringSet("parking_history", emptySet()) ?: emptySet()).toMutableSet()
+
+        if (mapped) {
+            prefs.edit()
+                .putString("last_detected_floor", floor)
+                .putString("last_detected_zone", zone)
+                .putFloat("last_detected_marker_x", markerX)
+                .putFloat("last_detected_marker_y", markerY)
+                .putString("last_detected_spot", "$spotText · BLE 비콘 확인")
+                .putString("selected_floor", floor)
+                .apply()
+        } else {
+            prefs.edit().putString("last_detected_spot", "등록된 비콘을 찾지 못함 · GPS 위치 기록").apply()
+        }
+
         if (location == null) {
-            prefs.edit().putString("monitor_status", "차량 연결 해제 감지 · 최근 위치 없음").apply()
+            if (mapped) {
+                val status = "BLE 비콘으로 $spotText 주차 위치 확인"
+                history.add("$time  |  $spotText  |  BLE 비콘")
+                prefs.edit().putString("last_location", "$spotText (BLE 비콘)")
+                    .putString("last_time", time).putString("monitor_status", status)
+                    .putStringSet("parking_history", history).apply()
+                updateNotification(status)
+            } else {
+                prefs.edit().putString("monitor_status", "차량 연결 해제 감지 · 최근 GPS 위치와 등록 비콘 없음").apply()
+            }
             return
         }
-        val time = SimpleDateFormat("yyyy.MM.dd HH:mm", Locale.KOREA).format(Date(location.time))
-        val ageMinutes = ((System.currentTimeMillis() - location.time).coerceAtLeast(0L) / 60000L)
+
+        val ageMinutes = ((now - location.time).coerceAtLeast(0L) / 60000L)
         val accuracyText = if (location.hasAccuracy()) " · 정확도 약 ${location.accuracy.toInt()}m" else ""
-        val status = if (ageMinutes <= 2) "차량 연결 해제 · 최근 수집 위치 저장 완료"
-            else "차량 연결 해제 · 마지막 위치 저장 (약 ${ageMinutes}분 전)"
-        val text = "위도 %.5f · 경도 %.5f%s".format(location.latitude, location.longitude, accuracyText)
-        val historyEntry = "$time  |  $text"
-        val history = (prefs.getStringSet("parking_history", emptySet()) ?: emptySet()).toMutableSet()
-        history.add(historyEntry)
-        prefs.edit().putString("last_location", text).putString("last_time", time)
+        val gpsText = "위도 %.5f · 경도 %.5f%s".format(location.latitude, location.longitude, accuracyText)
+        val savedText = if (mapped) "$spotText · $gpsText" else gpsText
+        val status = if (mapped) "BLE 비콘으로 $spotText 주차 위치 확인"
+            else if (ageMinutes <= 2) "차량 연결 해제 · 최근 수집 GPS 위치 저장"
+            else "차량 연결 해제 · 마지막 GPS 위치 저장 (약 ${ageMinutes}분 전)"
+        history.add("$time  |  $savedText")
+        prefs.edit().putString("last_location", savedText).putString("last_time", time)
             .putString("monitor_status", status)
             .putStringSet("parking_history", history).apply()
+        updateNotification(status)
     }
 
     private fun createNotificationChannel() {
