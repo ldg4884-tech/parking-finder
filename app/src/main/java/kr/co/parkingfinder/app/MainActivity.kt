@@ -82,7 +82,7 @@ private fun ParkingFinderApp() {
     var showHistory by remember { mutableStateOf(false) }
     var historyItems by remember { mutableStateOf(emptyList<String>()) }
     var selectedFloor by remember { mutableStateOf(prefs.getString("selected_floor", "B1") ?: "B1") }
-    val floors = listOf("B2", "B1", "1F")
+    val floors = listOf("B2", "B1")
     var selectedParkingBay by remember(selectedFloor) {
         mutableStateOf(prefs.getString("selected_bay_$selectedFloor", "") ?: "")
     }
@@ -169,14 +169,14 @@ private fun ParkingFinderApp() {
                                 }, label = { Text(floor) })
                             }
                         }
-                        AisleParkingMap(
+                        SectionedParkingMap(
                             selectedBay = selectedParkingBay,
                             onSelect = { bay ->
                                 selectedParkingBay = bay
                                 prefs.edit().putString("selected_bay_$selectedFloor", bay).apply()
                                 status = "$selectedFloor $bay 위치 선택됨"
                             },
-                            modifier = Modifier.fillMaxWidth().height(300.dp)
+                            modifier = Modifier.fillMaxWidth()
                         )
                         Text(
                             if (selectedParkingBay.isBlank()) "통로 양쪽의 주차면을 선택하세요."
@@ -351,36 +351,77 @@ private fun ParkingFinderApp() {
 
 
 @Composable
-private fun AisleParkingMap(
+private fun SectionedParkingMap(
     selectedBay: String,
     onSelect: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Column(modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text("주차 통로", color = Color(0xFF9BAABD), style = MaterialTheme.typography.labelSmall)
-        (1..6).forEach { number ->
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                ParkingBay("L-${number.toString().padStart(2, '0')}", selectedBay, onSelect, Modifier.weight(1f))
-                Surface(
-                    modifier = Modifier.weight(1.15f).height(42.dp),
-                    color = Color(0xFF24364A),
-                    shape = RoundedCornerShape(8.dp)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Text("차량 통로", color = Color(0xFF9BAABD), style = MaterialTheme.typography.labelSmall)
-                    }
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("구역별 주차 배치도", fontWeight = FontWeight.Bold, color = Color.White)
+            Text("개념 배치 · 실제 구조와 다를 수 있음",
+                color = Color(0xFFFFC978), style = MaterialTheme.typography.labelSmall)
+        }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            listOf("🛗 엘리베이터", "🚪 출입구", "↗ 램프", "▦ 기둥").forEach { label ->
+                Surface(color = Color(0xFF24364A), shape = RoundedCornerShape(8.dp)) {
+                    Text(label, Modifier.padding(horizontal = 7.dp, vertical = 7.dp),
+                        color = Color(0xFFD8E2ED), style = MaterialTheme.typography.labelSmall)
                 }
-                ParkingBay("R-${number.toString().padStart(2, '0')}", selectedBay, onSelect, Modifier.weight(1f))
             }
         }
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text("좌측 주차면", color = Color(0xFF9BAABD), style = MaterialTheme.typography.labelSmall)
-            Text("우측 주차면", color = Color(0xFF9BAABD), style = MaterialTheme.typography.labelSmall)
+        listOf("A", "B", "C", "D").forEachIndexed { index, zone ->
+            Card(
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF1D2D40)),
+                shape = RoundedCornerShape(14.dp)
+            ) {
+                Column(Modifier.fillMaxWidth().padding(10.dp),
+                    verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text("$zone 구역", color = Color(0xFF75D5C2), fontWeight = FontWeight.Bold)
+                        Text("기둥 \${index * 10 + 1} · \${index * 10 + 2}",
+                            color = Color(0xFF9BAABD), style = MaterialTheme.typography.labelSmall)
+                    }
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                        (1..3).forEach { number ->
+                            ParkingBay("$zone-\${number.toString().padStart(2, '0')}",
+                                selectedBay, onSelect, Modifier.weight(1f))
+                        }
+                    }
+                    Surface(
+                        Modifier.fillMaxWidth().height(28.dp),
+                        color = Color(0xFF30445A), shape = RoundedCornerShape(6.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Text("차량 통로", color = Color(0xFFB6C4D3),
+                                style = MaterialTheme.typography.labelSmall)
+                        }
+                    }
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                        (4..6).forEach { number ->
+                            ParkingBay("$zone-\${number.toString().padStart(2, '0')}",
+                                selectedBay, onSelect, Modifier.weight(1f))
+                        }
+                    }
+                }
+            }
         }
+        Surface(color = Color(0xFF26394D), shape = RoundedCornerShape(10.dp)) {
+            Column(Modifier.fillMaxWidth().padding(10.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text("공용 시설 위치", color = Color(0xFF75D5C2), fontWeight = FontWeight.SemiBold)
+                Text("엘리베이터 · 출입구 · 차량 램프",
+                    color = Color(0xFFE6EDF5), style = MaterialTheme.typography.bodySmall)
+                Text("실제 시설이 있는 구역을 확인한 뒤 위치를 확정할 수 있습니다.",
+                    color = Color(0xFF9BAABD), style = MaterialTheme.typography.labelSmall)
+            }
+        }
+        Text("주차면을 누르면 위치가 선택됩니다. A-01처럼 구역-번호로 저장됩니다.",
+            color = Color(0xFF9BAABD), style = MaterialTheme.typography.labelSmall)
     }
 }
 
