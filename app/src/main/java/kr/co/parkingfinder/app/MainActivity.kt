@@ -55,6 +55,8 @@ private fun ParkingFinderApp() {
     var selectedDeviceName by remember { mutableStateOf(prefs.getString("car_bt_name", "") ?: "") }
     var showDevices by remember { mutableStateOf(false) }
     var pairedDevices by remember { mutableStateOf(emptyList<BluetoothDevice>()) }
+    var showHistory by remember { mutableStateOf(false) }
+    var historyItems by remember { mutableStateOf(emptyList<String>()) }
 
     val locationPermission = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -170,7 +172,10 @@ private fun ParkingFinderApp() {
                         modifier = Modifier.weight(1f)) {
                         Icon(Icons.Default.Add, null); Text(" 도면 등록")
                     }
-                    OutlinedButton(onClick = { status = "주차 기록 기능은 다음 개발 단계에서 연결됩니다." },
+                    OutlinedButton(onClick = {
+                        historyItems = (prefs.getStringSet("parking_history", emptySet()) ?: emptySet()).toList().sortedDescending()
+                        showHistory = true
+                    },
                         modifier = Modifier.weight(1f)) {
                         Icon(Icons.Default.Map, null); Text(" 주차 기록")
                     }
@@ -179,6 +184,23 @@ private fun ParkingFinderApp() {
                     color = Color(0xFF8291A5), style = MaterialTheme.typography.labelSmall)
             }
         }
+    }
+
+    if (showHistory) {
+        AlertDialog(
+            onDismissRequest = { showHistory = false },
+            title = { Text("최근 주차 기록") },
+            text = {
+                if (historyItems.isEmpty()) Text("아직 저장된 주차 기록이 없습니다.")
+                else Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    historyItems.take(30).forEach { entry ->
+                        Text(entry, style = MaterialTheme.typography.bodyMedium)
+                        HorizontalDivider(color = Color(0xFF40536A))
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { showHistory = false }) { Text("닫기") } }
+        )
     }
 
     if (showDevices) {
