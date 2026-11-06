@@ -63,7 +63,7 @@ private fun ParkingFinderApp() {
     var status by remember { mutableStateOf(prefs.getString("monitor_status", "주차 감지 준비") ?: "") }
     var selectedDeviceName by remember { mutableStateOf(prefs.getString("car_bt_name", "") ?: "") }
     var bleBeaconText by remember { mutableStateOf(prefs.getString("latest_ble_beacon", "실내 비콘 신호 대기 중") ?: "실내 비콘 신호 대기 중") }
-    var beaconZoneLabel by remember { mutableStateOf("") }
+    var manualZoneLabel by remember { mutableStateOf(prefs.getString("last_detected_zone", "") ?: "") }
     var detectedSpotText by remember { mutableStateOf(prefs.getString("last_detected_spot", "아직 비콘으로 확인된 주차 구역이 없습니다") ?: "") }
     val activity = context as? ComponentActivity
     DisposableEffect(activity) {
@@ -74,8 +74,9 @@ private fun ParkingFinderApp() {
                 hasLocation = savedAt.isNotBlank()
                 status = prefs.getString("monitor_status", "주차 감지 준비") ?: "주차 감지 준비"
                 selectedDeviceName = prefs.getString("car_bt_name", "") ?: ""
-                bleBeaconText = prefs.getString("latest_ble_beacon", "실내 비콘 신호 대기 중") ?: "실내 비콘 신호 대기 중"
-                detectedSpotText = prefs.getString("last_detected_spot", "아직 비콘으로 확인된 주차 구역이 없습니다") ?: ""
+                bleBeaconText = prefs.getString("latest_ble_beacon", "비콘 없이 수동 위치 저장 가능") ?: "비콘 없이 수동 위치 저장 가능"
+                detectedSpotText = prefs.getString("last_detected_spot", "아직 저장된 주차 구역이 없습니다") ?: ""
+                manualZoneLabel = prefs.getString("last_detected_zone", "") ?: ""
             }
         }
         activity?.lifecycle?.addObserver(observer)
@@ -179,36 +180,48 @@ private fun ParkingFinderApp() {
                             color = Color(0xFF9BAABD), style = MaterialTheme.typography.bodyMedium
                         )
                         Spacer(Modifier.height(8.dp))
-                        Text(bleBeaconText, color = Color(0xFF75D5C2), style = MaterialTheme.typography.bodySmall)
+                        Text("비콘이나 주차장 도면이 없어도 층과 기둥 번호를 직접 저장할 수 있습니다.",
+                            color = Color(0xFF9BAABD), style = MaterialTheme.typography.bodySmall)
                         OutlinedTextField(
-                            value = beaconZoneLabel,
-                            onValueChange = { beaconZoneLabel = it },
+                            value = manualZoneLabel,
+                            onValueChange = { manualZoneLabel = it },
                             modifier = Modifier.fillMaxWidth(),
                             singleLine = true,
-                            label = { Text("주차 구역 이름 (예: 125번)") },
-                            placeholder = { Text("현재 도면에 표시된 위치에 비콘 연결") }
+                            label = { Text("주차 위치 / 기둥 번호") },
+                            placeholder = { Text("예: 125번 기둥, A구역 12번") }
                         )
-                        OutlinedButton(
+                        Button(
                             onClick = {
-                                val address = prefs.getString("latest_ble_address", null)
-                                if (address.isNullOrBlank()) {
-                                    status = "먼저 BLE 비콘 신호를 수신해 주세요."
-                                } else if (markerX < 0f || markerY < 0f) {
-                                    status = "먼저 선택한 층 도면을 눌러 위치를 표시해 주세요."
-                                } else if (beaconZoneLabel.isBlank()) {
-                                    status = "주차 구역 이름을 입력해 주세요."
+                                if (manualZoneLabel.isBlank()) {
+                                    status = "주차 위치나 기둥 번호를 입력해 주세요."
                                 } else {
-                                    val mapping = "$selectedFloor|${beaconZoneLabel.trim()}|$markerX|$markerY"
-                                    prefs.edit().putString("beacon_map_$address", mapping)
-                                        .putString("latest_mapped_ble_address", address)
-                                        .putInt("latest_mapped_ble_rssi", prefs.getInt("latest_ble_rssi", Int.MIN_VALUE))
-                                        .putLong("latest_mapped_ble_time", System.currentTimeMillis()).apply()
-                                    status = "$selectedFloor ${beaconZoneLabel.trim()} 구역에 현재 비콘을 등록했습니다."
-                                    detectedSpotText = "$selectedFloor ${beaconZoneLabel.trim()} · 비콘 등록 완료"
+                                    val zone = manualZoneLabel.trim()
+                                    val now = System.currentTimeMillis()
+                                    val time = SimpleDateFormat("yyyy.MM.dd HH:mm", Locale.KOREA).format(Date(now))
+                                    val spot = "$selectedFloor $zone"
+                                    val history = (prefs.getStringSet("parking_history", emptySet()) ?: emptySet()).toMutableSet()
+                                    history.add("$time  |  $spot  |  직접 저장")
+                                    prefs.edit()
+                                        .putString("last_detected_floor", selectedFloor)
+                                        .putString("last_detected_zone", zone)
+                                        .putFloat("last_detected_marker_x", markerX)
+                                        .putFloat("last_detected_marker_y", markerY)
+                                        .putString("last_detected_spot", spot)
+                                        .putString("last_location", spot)
+                                        .putString("last_time", time)
+                                        .putString("selected_floor", selectedFloor)
+                                        .putString("monitor_status", "$spot 주차 위치 저장 완료")
+                                        .putStringSet("parking_history", history)
+                                        .apply()
+                                    detectedSpotText = "마지막 주차 위치: $spot"
+                                    locationText = spot
+                                    savedAt = time
+                                    hasLocation = true
+                                    status = "$spot 위치를 저장했습니다."
                                 }
                             },
                             modifier = Modifier.fillMaxWidth()
-                        ) { Text("현재 비콘을 이 주차 위치에 등록") }
+                        ) { Text("이 주차 위치 저장") }
                         Text(detectedSpotText, color = Color(0xFF9CE8D8), style = MaterialTheme.typography.bodySmall)
                         Spacer(Modifier.height(12.dp))
                         Button(onClick = {
@@ -282,7 +295,7 @@ private fun ParkingFinderApp() {
                         Column(Modifier.align(Alignment.TopStart).padding(8.dp)) {
                             Text("$selectedFloor 주차장 도면", fontWeight = FontWeight.Bold)
                             Text(
-                                if (floorPlanImage != null) "등록된 도면" else "도면을 등록해 주차장을 표시하세요",
+                                if (floorPlanImage != null) "등록된 도면 · 눌러서 위치 지정" else "간이 지도 · 도면 없이도 위치 저장 가능",
                                 color = Color(0xFF9BAABD), style = MaterialTheme.typography.labelSmall
                             )
                         }
@@ -306,7 +319,7 @@ private fun ParkingFinderApp() {
                     }
                     }
                 }
-                Text("도면을 누르면 민트색 위치 표시가 저장됩니다. 층별 도면과 위치는 각각 보관됩니다.",
+                Text("층과 기둥 번호를 입력해 저장하세요. 도면이 있으면 눌러서 위치도 함께 표시할 수 있습니다.",
                     color = Color(0xFF8291A5), style = MaterialTheme.typography.labelSmall)
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     OutlinedButton(onClick = { floorPlanPicker.launch(arrayOf("image/*")) },
@@ -321,7 +334,7 @@ private fun ParkingFinderApp() {
                         Icon(Icons.Default.Map, null); Text(" 주차 기록")
                     }
                 }
-                Text("차량 블루투스 연결이 끊기면 마지막으로 확인된 위치를 기록합니다. 지하 주차면 단위의 정확한 위치는 실내 측위 연동이 추가로 필요합니다.",
+                Text("차량 블루투스 연결 해제는 주차 시점을 감지합니다. 기둥 번호는 직접 입력해 저장하며, 실제 주차면 자동 인식에는 별도 실내 측위가 필요합니다.",
                     color = Color(0xFF8291A5), style = MaterialTheme.typography.labelSmall)
             }
         }
