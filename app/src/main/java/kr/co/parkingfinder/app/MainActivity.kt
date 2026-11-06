@@ -31,6 +31,8 @@ import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -55,6 +57,20 @@ class MainActivity : ComponentActivity() {
 private fun ParkingFinderApp() {
     val context = androidx.compose.ui.platform.LocalContext.current
     val prefs = remember { context.getSharedPreferences("parking_finder", 0) }
+    val activity = context as? ComponentActivity
+    DisposableEffect(activity) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                locationText = prefs.getString("last_location", "아직 저장된 주차 위치가 없습니다") ?: ""
+                savedAt = prefs.getString("last_time", "") ?: ""
+                hasLocation = savedAt.isNotBlank()
+                status = prefs.getString("monitor_status", "주차 감지 준비") ?: "주차 감지 준비"
+                selectedDeviceName = prefs.getString("car_bt_name", "") ?: ""
+            }
+        }
+        activity?.lifecycle?.addObserver(observer)
+        onDispose { activity?.lifecycle?.removeObserver(observer) }
+    }
     var locationText by remember { mutableStateOf(prefs.getString("last_location", "아직 저장된 주차 위치가 없습니다") ?: "") }
     var savedAt by remember { mutableStateOf(prefs.getString("last_time", "") ?: "") }
     var hasLocation by remember { mutableStateOf(savedAt.isNotBlank()) }
@@ -240,6 +256,15 @@ private fun ParkingFinderApp() {
                             if (hasLocation) Text(locationText, color = Color(0xFF9BAABD), style = MaterialTheme.typography.labelSmall)
                             if (savedAt.isNotBlank()) Text(savedAt, color = Color(0xFF75D5C2),
                                 style = MaterialTheme.typography.labelSmall)
+                            if (markerX >= 0f && markerY >= 0f) {
+                                TextButton(onClick = {
+                                    markerX = -1f
+                                    markerY = -1f
+                                    prefs.edit().remove("marker_x_$selectedFloor")
+                                        .remove("marker_y_$selectedFloor").apply()
+                                    status = "$selectedFloor 도면의 위치 표시를 지웠습니다."
+                                }) { Text("위치 표시 지우기") }
+                            }
                         }
                     }
                     }
