@@ -183,7 +183,6 @@ class CarBluetoothMonitorService : Service() {
         val zone = if (mapped) parts!![1] else ""
         val markerX = if (mapped) parts!![2].toFloatOrNull() ?: -1f else -1f
         val markerY = if (mapped) parts!![3].toFloatOrNull() ?: -1f else -1f
-        val spotText = if (mapped) "$floor $zone" else "비콘 미등록 · GPS 위치만 기록"
 
         val fine = checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
         val coarse = checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
@@ -209,50 +208,48 @@ class CarBluetoothMonitorService : Service() {
                 accuracy = prefs.getFloat("latest_location_accuracy", 0f)
             })
         }
-        val location = candidates.maxByOrNull { it.time }
+
+        // The parking event time is the Bluetooth disconnect time, not the age of the cached GPS fix.
         val now = System.currentTimeMillis()
-        val recordedTime = if (location != null) location.time else now
-        val time = SimpleDateFormat("yyyy.MM.dd HH:mm", Locale.KOREA).format(Date(recordedTime))
+        val time = SimpleDateFormat("yyyy.MM.dd HH:mm", Locale.KOREA).format(Date(now))
+        val location = candidates.maxByOrNull { it.time }
+        val ageMinutes = location?.let { ((now - it.time).coerceAtLeast(0L) / 60000L) }
+        val locationUsable = location != null && ageMinutes!! <= 10L
+        val accuracyText = if (locationUsable && location!!.hasAccuracy()) " · 정확도 약 ${location.accuracy.toInt()}m" else ""
+        val gpsText = if (locationUsable) {
+            "GPS 위도 %.5f · 경도 %.5f%s".format(location!!.latitude, location.longitude, accuracyText)
+        } else if (location != null) {
+            "최근 GPS 정보가 오래됨(약 ${ageMinutes}분 전)"
+        } else {
+            "GPS 위치 정보 없음"
+        }
+
+        val spotText = if (mapped) "$floor $zone" else ""
+        val savedText = if (mapped) "$spotText · BLE 비콘 확인 · $gpsText" else gpsText
+        val status = when {
+            mapped -> "자동 주차 기록 완료 · $spotText 위치 확인"
+            locationUsable -> "주차 시점 자동 기록 완료 · 기둥 번호 확인 필요"
+            else -> "주차 시점 자동 기록 완료 · GPS 위치 없음, 기둥 번호 확인 필요"
+        }
+
         val history = (prefs.getStringSet("parking_history", emptySet()) ?: emptySet()).toMutableSet()
+        history.add("$time  |  ${if (mapped) "$spotText · " else ""}$gpsText  |  차량 블루투스 해제 자동 기록")
+
+        val editor = prefs.edit()
+            .putString("last_time", time)
+            .putString("last_location", if (mapped) "$spotText · $gpsText" else "주차 시점 자동 기록됨 · $gpsText · 기둥 번호 확인 필요")
+            .putString("monitor_status", status)
+            .putString("last_detected_spot", if (mapped) "$spotText · BLE 비콘 확인" else "기둥 번호 미확인 · 사진 촬영 또는 직접 입력 가능")
+            .putStringSet("parking_history", history)
 
         if (mapped) {
-            prefs.edit()
-                .putString("last_detected_floor", floor)
+            editor.putString("last_detected_floor", floor)
                 .putString("last_detected_zone", zone)
                 .putFloat("last_detected_marker_x", markerX)
                 .putFloat("last_detected_marker_y", markerY)
-                .putString("last_detected_spot", "$spotText · BLE 비콘 확인")
                 .putString("selected_floor", floor)
-                .apply()
-        } else {
-            prefs.edit().putString("last_detected_spot", "등록된 비콘을 찾지 못함 · GPS 위치 기록").apply()
         }
-
-        if (location == null) {
-            if (mapped) {
-                val status = "BLE 비콘으로 $spotText 주차 위치 확인"
-                history.add("$time  |  $spotText  |  BLE 비콘")
-                prefs.edit().putString("last_location", "$spotText (BLE 비콘)")
-                    .putString("last_time", time).putString("monitor_status", status)
-                    .putStringSet("parking_history", history).apply()
-                updateNotification(status)
-            } else {
-                prefs.edit().putString("monitor_status", "차량 연결 해제 감지 · 최근 GPS 위치와 등록 비콘 없음").apply()
-            }
-            return
-        }
-
-        val ageMinutes = ((now - location.time).coerceAtLeast(0L) / 60000L)
-        val accuracyText = if (location.hasAccuracy()) " · 정확도 약 ${location.accuracy.toInt()}m" else ""
-        val gpsText = "위도 %.5f · 경도 %.5f%s".format(location.latitude, location.longitude, accuracyText)
-        val savedText = if (mapped) "$spotText · $gpsText" else gpsText
-        val status = if (mapped) "BLE 비콘으로 $spotText 주차 위치 확인"
-            else if (ageMinutes <= 2) "차량 연결 해제 · 최근 수집 GPS 위치 저장"
-            else "차량 연결 해제 · 마지막 GPS 위치 저장 (약 ${ageMinutes}분 전)"
-        history.add("$time  |  $savedText")
-        prefs.edit().putString("last_location", savedText).putString("last_time", time)
-            .putString("monitor_status", status)
-            .putStringSet("parking_history", history).apply()
+        editor.apply()
         updateNotification(status)
     }
 
