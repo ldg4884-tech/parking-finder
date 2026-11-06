@@ -14,6 +14,8 @@ import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bluetooth
@@ -152,8 +154,38 @@ private fun ParkingFinderApp() {
                 containerColor = Color(0xFF0D1420), titleContentColor = Color.White
             ))
         }) { padding ->
-            Column(Modifier.fillMaxSize().padding(padding).padding(18.dp),
+            Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(18.dp),
                 verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                Text("최근 주차 위치", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Card(Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF172334)),
+                    shape = RoundedCornerShape(22.dp)) {
+                    Column(Modifier.fillMaxSize().padding(12.dp)) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            floors.forEach { floor ->
+                                FilterChip(selected = selectedFloor == floor, onClick = {
+                                    selectedFloor = floor
+                                    prefs.edit().putString("selected_floor", floor).apply()
+                                }, label = { Text(floor) })
+                            }
+                        }
+                        AisleParkingMap(
+                            selectedBay = selectedParkingBay,
+                            onSelect = { bay ->
+                                selectedParkingBay = bay
+                                prefs.edit().putString("selected_bay_$selectedFloor", bay).apply()
+                                status = "$selectedFloor $bay 위치 선택됨"
+                            },
+                            modifier = Modifier.fillMaxWidth().height(300.dp)
+                        )
+                        Text(
+                            if (selectedParkingBay.isBlank()) "통로 양쪽의 주차면을 선택하세요."
+                            else "선택 위치: $selectedFloor · $selectedParkingBay",
+                            color = Color(0xFF75D5C2),
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                }
                 Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF172334)),
                     shape = RoundedCornerShape(22.dp)) {
                     Column(Modifier.padding(18.dp)) {
@@ -255,36 +287,6 @@ private fun ParkingFinderApp() {
                         }, modifier = Modifier.fillMaxWidth()) {
                             Text("자동 주차 감지 켜기")
                         }
-                    }
-                }
-                Text("최근 주차 위치", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                Card(Modifier.fillMaxWidth().weight(1f),
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFF172334)),
-                    shape = RoundedCornerShape(22.dp)) {
-                    Column(Modifier.fillMaxSize().padding(12.dp)) {
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            floors.forEach { floor ->
-                                FilterChip(selected = selectedFloor == floor, onClick = {
-                                    selectedFloor = floor
-                                    prefs.edit().putString("selected_floor", floor).apply()
-                                }, label = { Text(floor) })
-                            }
-                        }
-                        AisleParkingMap(
-                            selectedBay = selectedParkingBay,
-                            onSelect = { bay ->
-                                selectedParkingBay = bay
-                                prefs.edit().putString("selected_bay_$selectedFloor", bay).apply()
-                                status = "$selectedFloor $bay 위치 선택됨"
-                            },
-                            modifier = Modifier.fillMaxWidth().height(300.dp)
-                        )
-                        Text(
-                            if (selectedParkingBay.isBlank()) "통로 양쪽의 주차면을 선택하세요."
-                            else "선택 위치: $selectedFloor · $selectedParkingBay",
-                            color = Color(0xFF75D5C2),
-                            style = MaterialTheme.typography.bodySmall
-                        )
                     }
                 }
                 Text("통로 양쪽 주차면을 선택하고 기둥 번호를 직접 입력하거나 카메라로 인식해 저장하세요.",
