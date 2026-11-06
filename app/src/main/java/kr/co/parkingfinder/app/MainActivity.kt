@@ -171,6 +171,8 @@ private fun ParkingFinderApp() {
                         }
                         SectionedParkingMap(
                             selectedBay = selectedParkingBay,
+                            lastSavedBay = if ((prefs.getString("last_detected_floor", "") ?: "") == selectedFloor)
+                                prefs.getString("last_detected_bay", "") ?: "" else "",
                             facilityByZone = listOf("A", "B", "C", "D").associateWith {
                                 prefs.getString("facility_${selectedFloor}_$it", "없음") ?: "없음"
                             },
@@ -385,6 +387,7 @@ private fun ParkingFinderApp() {
 @Composable
 private fun SectionedParkingMap(
     selectedBay: String,
+    lastSavedBay: String,
     facilityByZone: Map<String, String>,
     pillarsByZone: Map<String, String>,
     facilityPositionByZone: Map<String, String>,
@@ -454,7 +457,7 @@ private fun SectionedParkingMap(
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
                         (1..upperCount).forEach { number ->
                             ParkingBay("$zone-${number.toString().padStart(2, '0')}",
-                                selectedBay, onSelect, Modifier.weight(1f))
+                                selectedBay, lastSavedBay, onSelect, Modifier.weight(1f))
                         }
                     }
                     Surface(Modifier.fillMaxWidth().height(28.dp),
@@ -529,22 +532,40 @@ private fun SectionedParkingMap(
 private fun ParkingBay(
     bay: String,
     selectedBay: String,
+    lastSavedBay: String,
     onSelect: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val selected = bay == selectedBay
+    val lastSaved = bay == lastSavedBay
     Surface(
         onClick = { onSelect(bay) },
         modifier = modifier.height(42.dp),
-        color = if (selected) Color(0xFF24564D) else Color(0xFF24364A),
-        contentColor = if (selected) Color(0xFF9CE8D8) else Color(0xFFE6EDF5),
+        color = when {
+            selected -> Color(0xFF24564D)
+            lastSaved -> Color(0xFF59451F)
+            else -> Color(0xFF24364A)
+        },
+        contentColor = when {
+            selected -> Color(0xFF9CE8D8)
+            lastSaved -> Color(0xFFFFD98A)
+            else -> Color(0xFFE6EDF5)
+        },
         shape = RoundedCornerShape(8.dp),
         border = androidx.compose.foundation.BorderStroke(
-            1.dp, if (selected) Color(0xFF75D5C2) else Color(0xFF40536A)
+            1.dp, when {
+                selected -> Color(0xFF75D5C2)
+                lastSaved -> Color(0xFFFFC857)
+                else -> Color(0xFF40536A)
+            }
         )
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
-            Text(if (selected) "🚗 " else "▱ ", style = MaterialTheme.typography.labelMedium)
+            Text(when {
+                selected -> "🚗 "
+                lastSaved -> "★ "
+                else -> "▱ "
+            }, style = MaterialTheme.typography.labelMedium)
             Text(bay, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
         }
     }
