@@ -7,6 +7,11 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.location.Location
 import android.location.LocationManager
+import android.graphics.BitmapFactory
+import android.net.Uri
+import androidx.compose.foundation.Image
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -57,6 +62,34 @@ private fun ParkingFinderApp() {
     var pairedDevices by remember { mutableStateOf(emptyList<BluetoothDevice>()) }
     var showHistory by remember { mutableStateOf(false) }
     var historyItems by remember { mutableStateOf(emptyList<String>()) }
+    var floorPlanUri by remember { mutableStateOf(prefs.getString("floor_plan_uri", null)) }
+    var floorPlanImage by remember(floorPlanUri) {
+        mutableStateOf(
+            try {
+                floorPlanUri?.let { savedUri ->
+                    context.contentResolver.openInputStream(Uri.parse(savedUri))?.use { stream ->
+                        BitmapFactory.decodeStream(stream)?.asImageBitmap()
+                    }
+                }
+            } catch (_: Exception) { null }
+        )
+    }
+    val floorPlanPicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) {
+            try {
+                context.contentResolver.takePersistableUriPermission(
+                    uri, Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+                floorPlanUri = uri.toString()
+                prefs.edit().putString("floor_plan_uri", floorPlanUri).apply()
+                status = "주차장 도면 등록 완료"
+            } catch (_: Exception) {
+                status = "도면을 저장하지 못했습니다. 다시 선택해 주세요."
+            }
+        }
+    }
 
     val locationPermission = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -153,11 +186,22 @@ private fun ParkingFinderApp() {
                     colors = CardDefaults.cardColors(containerColor = Color(0xFF172334)),
                     shape = RoundedCornerShape(22.dp)) {
                     Box(Modifier.fillMaxSize().padding(12.dp)) {
-                        ParkingPlanPreview(Modifier.fillMaxSize())
+                        if (floorPlanImage != null) {
+                            Image(
+                                bitmap = floorPlanImage!!,
+                                contentDescription = "등록된 주차장 도면",
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = ContentScale.Fit
+                            )
+                        } else {
+                            ParkingPlanPreview(Modifier.fillMaxSize())
+                        }
                         Column(Modifier.align(Alignment.TopStart).padding(8.dp)) {
                             Text("주차장 도면", fontWeight = FontWeight.Bold)
-                            Text("도면 등록 후 위치 매핑 지원 예정",
-                                color = Color(0xFF9BAABD), style = MaterialTheme.typography.labelSmall)
+                            Text(
+                                if (floorPlanImage != null) "등록된 도면" else "도면을 등록해 주차장을 표시하세요",
+                                color = Color(0xFF9BAABD), style = MaterialTheme.typography.labelSmall
+                            )
                         }
                         Column(Modifier.align(Alignment.BottomCenter).padding(10.dp)) {
                             Text(if (hasLocation) locationText else "도면을 등록하면 차량 위치가 표시됩니다.",
@@ -168,7 +212,7 @@ private fun ParkingFinderApp() {
                     }
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    OutlinedButton(onClick = { status = "도면 등록 기능은 다음 개발 단계에서 연결됩니다." },
+                    OutlinedButton(onClick = { floorPlanPicker.launch(arrayOf("image/*")) },
                         modifier = Modifier.weight(1f)) {
                         Icon(Icons.Default.Add, null); Text(" 도면 등록")
                     }
