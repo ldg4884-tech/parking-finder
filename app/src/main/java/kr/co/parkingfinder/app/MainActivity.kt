@@ -1,9 +1,13 @@
 package kr.co.parkingfinder.app
 
 import android.Manifest
+import android.bluetooth.BluetoothAdapter
+import android.bluetooth.BluetoothDevice
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.location.Location
 import android.location.LocationManager
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -13,6 +17,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Bluetooth
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.MyLocation
@@ -41,10 +46,14 @@ class MainActivity : ComponentActivity() {
 @Composable
 private fun ParkingFinderApp() {
     val context = androidx.compose.ui.platform.LocalContext.current
-    var locationText by remember { mutableStateOf("아직 저장된 주차 위치가 없습니다") }
-    var savedAt by remember { mutableStateOf("") }
-    var hasLocation by remember { mutableStateOf(false) }
-    var status by remember { mutableStateOf("주차 감지 준비") }
+    val prefs = remember { context.getSharedPreferences("parking_finder", 0) }
+    var locationText by remember { mutableStateOf(prefs.getString("last_location", "아직 저장된 주차 위치가 없습니다") ?: "") }
+    var savedAt by remember { mutableStateOf(prefs.getString("last_time", "") ?: "") }
+    var hasLocation by remember { mutableStateOf(savedAt.isNotBlank()) }
+    var status by remember { mutableStateOf(prefs.getString("monitor_status", "주차 감지 준비") ?: "") }
+    var selectedDeviceName by remember { mutableStateOf(prefs.getString("car_bt_name", "") ?: "") }
+    var showDevices by remember { mutableStateOf(false) }
+    var pairedDevices by remember { mutableStateOf(emptyList<BluetoothDevice>()) }
 
     val locationPermission = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -55,6 +64,15 @@ private fun ParkingFinderApp() {
                 locationText = text; savedAt = time; hasLocation = time.isNotBlank(); status = message
             }
         } else status = "위치 권한이 필요합니다"
+    }
+
+    val bluetoothPermission = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            pairedDevices = getPairedDevices()
+            showDevices = true
+        } else status = "차량 블루투스 기기 확인 권한이 필요합니다"
     }
 
     MaterialTheme(colorScheme = darkColorScheme(
@@ -74,7 +92,7 @@ private fun ParkingFinderApp() {
             ))
         }) { padding ->
             Column(Modifier.fillMaxSize().padding(padding).padding(18.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                verticalArrangement = Arrangement.spacedBy(14.dp)) {
                 Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF172334)),
                     shape = RoundedCornerShape(22.dp)) {
                     Column(Modifier.padding(18.dp)) {
@@ -83,29 +101,51 @@ private fun ParkingFinderApp() {
                             Text("  주차 위치 모니터링", fontWeight = FontWeight.SemiBold)
                             Spacer(Modifier.weight(1f))
                             Surface(color = Color(0xFF25463F), shape = RoundedCornerShape(20.dp)) {
-                                Text("준비됨", Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                                Text("자동 감지", Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
                                     color = Color(0xFF9CE8D8), style = MaterialTheme.typography.labelSmall)
                             }
                         }
-                        Spacer(Modifier.height(12.dp))
+                        Spacer(Modifier.height(10.dp))
                         Text(status, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                        Text("자동 주차 감지 기능을 준비하고 있습니다.",
-                            color = Color(0xFF9BAABD), style = MaterialTheme.typography.bodyMedium)
-                        Spacer(Modifier.height(14.dp))
+                        Text(
+                            if (selectedDeviceName.isBlank()) "차량 블루투스를 등록하면 연결 해제 시 주차 위치를 기록합니다."
+                            else "감지 차량: $selectedDeviceName",
+                            color = Color(0xFF9BAABD), style = MaterialTheme.typography.bodyMedium
+                        )
+                        Spacer(Modifier.height(12.dp))
                         Button(onClick = {
-                            val fine = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
-                            val coarse = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
-                            if (fine || coarse) captureLocation(context) { text, time, message ->
-                                locationText = text; savedAt = time; hasLocation = time.isNotBlank(); status = message
-                            } else locationPermission.launch(arrayOf(
-                                Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION
-                            ))
+                            if (Build.VERSION.SDK_INT >= 31 &&
+                                ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
+                                bluetoothPermission.launch(Manifest.permission.BLUETOOTH_CONNECT)
+                            } else {
+                                pairedDevices = getPairedDevices()
+                                showDevices = true
+                            }
                         }, modifier = Modifier.fillMaxWidth()) {
-                            Icon(Icons.Default.LocationOn, null); Text("  현재 위치 확인 및 저장")
+                            Icon(Icons.Default.Bluetooth, null)
+                            Text("  차량 블루투스 기기 선택")
+                        }
+                        OutlinedButton(onClick = {
+                            val address = prefs.getString("car_bt_address", null)
+                            if (address.isNullOrBlank()) {
+                                status = "먼저 차량 블루투스 기기를 선택해 주세요."
+                            } else if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED &&
+                                ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                                locationPermission.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION))
+                            } else if (Build.VERSION.SDK_INT >= 31 &&
+                                ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
+                                bluetoothPermission.launch(Manifest.permission.BLUETOOTH_CONNECT)
+                            } else {
+                                ContextCompat.startForegroundService(context, Intent(context, CarBluetoothMonitorService::class.java))
+                                status = "차량 블루투스 연결 감지 중"
+                                prefs.edit().putString("monitor_status", status).apply()
+                            }
+                        }, modifier = Modifier.fillMaxWidth()) {
+                            Text("자동 주차 감지 켜기")
                         }
                     }
                 }
-                Text("내 주차 위치", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Text("최근 주차 위치", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 Card(Modifier.fillMaxWidth().weight(1f),
                     colors = CardDefaults.cardColors(containerColor = Color(0xFF172334)),
                     shape = RoundedCornerShape(22.dp)) {
@@ -134,24 +174,64 @@ private fun ParkingFinderApp() {
                         Icon(Icons.Default.Map, null); Text(" 주차 기록")
                     }
                 }
-                Text("현재 버전은 화면 및 위치 저장 기반입니다. 실내 주차면 자동 판별은 위치 보정 기술 연동 후 제공됩니다.",
+                Text("차량 블루투스 연결이 끊기면 마지막으로 확인된 위치를 기록합니다. 지하 주차면 단위의 정확한 위치는 실내 측위 연동이 추가로 필요합니다.",
                     color = Color(0xFF8291A5), style = MaterialTheme.typography.labelSmall)
             }
         }
     }
+
+    if (showDevices) {
+        AlertDialog(
+            onDismissRequest = { showDevices = false },
+            title = { Text("차량 블루투스 선택") },
+            text = {
+                if (pairedDevices.isEmpty()) {
+                    Text("페어링된 블루투스 기기가 없습니다. 차량과 휴대폰을 먼저 페어링해 주세요.")
+                } else {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        pairedDevices.forEach { device ->
+                            TextButton(onClick = {
+                                val name = try { device.name ?: "차량 블루투스" } catch (_: SecurityException) { "차량 블루투스" }
+                                prefs.edit().putString("car_bt_address", device.address)
+                                    .putString("car_bt_name", name).apply()
+                                selectedDeviceName = name
+                                showDevices = false
+                                status = "차량 기기 등록 완료 · 자동 감지를 켜 주세요"
+                            }) {
+                                Text(try { device.name ?: "이름 없는 기기" } catch (_: SecurityException) { "블루투스 기기" })
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { showDevices = false }) { Text("닫기") } }
+        )
+    }
+}
+
+private fun getPairedDevices(): List<BluetoothDevice> {
+    return try {
+        BluetoothAdapter.getDefaultAdapter()?.bondedDevices?.toList()?.sortedBy {
+            it.name ?: ""
+        } ?: emptyList()
+    } catch (_: SecurityException) { emptyList() }
 }
 
 private fun captureLocation(context: android.content.Context, result: (String, String, String) -> Unit) {
     val manager = context.getSystemService(LocationManager::class.java)
-    val location: Location? = try {
-        manager.getLastKnownLocation(LocationManager.GPS_PROVIDER)
-            ?: manager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
-    } catch (_: SecurityException) { null }
+    val candidates = try {
+        listOfNotNull(
+            manager.getLastKnownLocation(LocationManager.GPS_PROVIDER),
+            manager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER),
+            manager.getLastKnownLocation(LocationManager.PASSIVE_PROVIDER)
+        )
+    } catch (_: SecurityException) { emptyList() }
+    val location = candidates.maxByOrNull { it.time }
     if (location != null) {
         val text = "위도 %.5f · 경도 %.5f".format(location.latitude, location.longitude)
-        val time = SimpleDateFormat("yyyy.MM.dd HH:mm", Locale.KOREA).format(Date())
+        val time = SimpleDateFormat("yyyy.MM.dd HH:mm", Locale.KOREA).format(Date(location.time))
         result(text, time, "현재 위치 저장 완료")
-    } else result("위치 정보를 아직 가져오지 못했습니다.", "", "위치 신호를 기다리는 중")
+    } else result("최근 위치 정보가 없습니다.", "", "위치 정보를 가져오지 못했습니다. 위치 권한과 GPS를 확인해 주세요.")
 }
 
 @Composable
