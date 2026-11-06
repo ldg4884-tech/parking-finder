@@ -19,6 +19,8 @@ import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -62,7 +64,14 @@ private fun ParkingFinderApp() {
     var pairedDevices by remember { mutableStateOf(emptyList<BluetoothDevice>()) }
     var showHistory by remember { mutableStateOf(false) }
     var historyItems by remember { mutableStateOf(emptyList<String>()) }
-    var floorPlanUri by remember { mutableStateOf(prefs.getString("floor_plan_uri", null)) }
+    var selectedFloor by remember { mutableStateOf(prefs.getString("selected_floor", "B1") ?: "B1") }
+    val floors = listOf("B2", "B1", "1F")
+    val floorKey = "floor_plan_uri_$selectedFloor"
+    var floorPlanUri by remember(selectedFloor) {
+        mutableStateOf(prefs.getString(floorKey, if (selectedFloor == "B1") prefs.getString("floor_plan_uri", null) else null))
+    }
+    var markerX by remember(selectedFloor) { mutableFloatStateOf(prefs.getFloat("marker_x_$selectedFloor", -1f)) }
+    var markerY by remember(selectedFloor) { mutableFloatStateOf(prefs.getFloat("marker_y_$selectedFloor", -1f)) }
     var floorPlanImage by remember(floorPlanUri) {
         mutableStateOf(
             try {
@@ -83,8 +92,8 @@ private fun ParkingFinderApp() {
                     uri, Intent.FLAG_GRANT_READ_URI_PERMISSION
                 )
                 floorPlanUri = uri.toString()
-                prefs.edit().putString("floor_plan_uri", floorPlanUri).apply()
-                status = "주차장 도면 등록 완료"
+                prefs.edit().putString(floorKey, floorPlanUri).putString("selected_floor", selectedFloor).apply()
+                status = "$selectedFloor 도면 등록 완료"
             } catch (_: Exception) {
                 status = "도면을 저장하지 못했습니다. 다시 선택해 주세요."
             }
@@ -185,32 +194,57 @@ private fun ParkingFinderApp() {
                 Card(Modifier.fillMaxWidth().weight(1f),
                     colors = CardDefaults.cardColors(containerColor = Color(0xFF172334)),
                     shape = RoundedCornerShape(22.dp)) {
-                    Box(Modifier.fillMaxSize().padding(12.dp)) {
-                        if (floorPlanImage != null) {
-                            Image(
-                                bitmap = floorPlanImage!!,
-                                contentDescription = "등록된 주차장 도면",
-                                modifier = Modifier.fillMaxSize(),
-                                contentScale = ContentScale.Fit
-                            )
-                        } else {
-                            ParkingPlanPreview(Modifier.fillMaxSize())
+                    Column(Modifier.fillMaxSize().padding(12.dp)) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            floors.forEach { floor ->
+                                FilterChip(selected = selectedFloor == floor, onClick = {
+                                    selectedFloor = floor
+                                    prefs.edit().putString("selected_floor", floor).apply()
+                                }, label = { Text(floor) })
+                            }
+                        }
+                        Box(Modifier.fillMaxWidth().weight(1f)) {
+                        Box(Modifier.fillMaxSize().pointerInput(selectedFloor, floorPlanUri) {
+                            detectTapGestures { tap ->
+                                markerX = (tap.x / size.width).coerceIn(0f, 1f)
+                                markerY = (tap.y / size.height).coerceIn(0f, 1f)
+                                prefs.edit().putFloat("marker_x_$selectedFloor", markerX)
+                                    .putFloat("marker_y_$selectedFloor", markerY).apply()
+                                status = "$selectedFloor 도면에 주차 위치를 표시했습니다."
+                            }
+                        }) {
+                            if (floorPlanImage != null) {
+                                Image(bitmap = floorPlanImage!!, contentDescription = "$selectedFloor 주차장 도면",
+                                    modifier = Modifier.fillMaxSize(), contentScale = ContentScale.FillBounds)
+                            } else ParkingPlanPreview(Modifier.fillMaxSize())
+                            if (markerX >= 0f && markerY >= 0f) {
+                                Canvas(Modifier.fillMaxSize()) {
+                                    val center = Offset(size.width * markerX, size.height * markerY)
+                                    drawCircle(Color(0xFF75D5C2).copy(alpha = 0.28f), 24.dp.toPx(), center)
+                                    drawCircle(Color(0xFF75D5C2), 9.dp.toPx(), center)
+                                    drawCircle(Color.White, 3.dp.toPx(), center)
+                                }
+                            }
                         }
                         Column(Modifier.align(Alignment.TopStart).padding(8.dp)) {
-                            Text("주차장 도면", fontWeight = FontWeight.Bold)
+                            Text("$selectedFloor 주차장 도면", fontWeight = FontWeight.Bold)
                             Text(
                                 if (floorPlanImage != null) "등록된 도면" else "도면을 등록해 주차장을 표시하세요",
                                 color = Color(0xFF9BAABD), style = MaterialTheme.typography.labelSmall
                             )
                         }
                         Column(Modifier.align(Alignment.BottomCenter).padding(10.dp)) {
-                            Text(if (hasLocation) locationText else "도면을 등록하면 차량 위치가 표시됩니다.",
+                            Text(if (markerX >= 0f && markerY >= 0f) "도면에 지정한 위치가 표시되어 있습니다."
+                                else "도면을 눌러 주차 위치를 직접 표시할 수 있습니다.",
                                 color = Color(0xFF9BAABD), style = MaterialTheme.typography.bodySmall)
+                            if (hasLocation) Text(locationText, color = Color(0xFF9BAABD), style = MaterialTheme.typography.labelSmall)
                             if (savedAt.isNotBlank()) Text(savedAt, color = Color(0xFF75D5C2),
                                 style = MaterialTheme.typography.labelSmall)
                         }
                     }
                 }
+                Text("도면을 누르면 민트색 위치 표시가 저장됩니다. 층별 도면과 위치는 각각 보관됩니다.",
+                    color = Color(0xFF8291A5), style = MaterialTheme.typography.labelSmall)
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     OutlinedButton(onClick = { floorPlanPicker.launch(arrayOf("image/*")) },
                         modifier = Modifier.weight(1f)) {
