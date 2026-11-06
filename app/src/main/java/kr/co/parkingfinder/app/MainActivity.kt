@@ -61,7 +61,7 @@ private fun ParkingFinderApp() {
     var savedAt by remember { mutableStateOf(prefs.getString("last_time", "") ?: "") }
     var hasLocation by remember { mutableStateOf(savedAt.isNotBlank()) }
     var status by remember { mutableStateOf(prefs.getString("monitor_status", "주차 감지 준비") ?: "") }
-    var selectedDeviceName by remember { mutableStateOf(prefs.getString("car_bt_name", "") ?: "") }
+    var selectedDeviceName by remember { mutableStateOf(prefs.getString("car_bt_name", "") ?: "") }\n    var bleBeaconText by remember { mutableStateOf(prefs.getString("latest_ble_beacon", "실내 비콘 신호 대기 중") ?: "실내 비콘 신호 대기 중") }
     val activity = context as? ComponentActivity
     DisposableEffect(activity) {
         val observer = LifecycleEventObserver { _, event ->
@@ -70,7 +70,7 @@ private fun ParkingFinderApp() {
                 savedAt = prefs.getString("last_time", "") ?: ""
                 hasLocation = savedAt.isNotBlank()
                 status = prefs.getString("monitor_status", "주차 감지 준비") ?: "주차 감지 준비"
-                selectedDeviceName = prefs.getString("car_bt_name", "") ?: ""
+                selectedDeviceName = prefs.getString("car_bt_name", "") ?: ""\n                bleBeaconText = prefs.getString("latest_ble_beacon", "실내 비콘 신호 대기 중") ?: "실내 비콘 신호 대기 중"
             }
         }
         activity?.lifecycle?.addObserver(observer)
@@ -167,7 +167,7 @@ private fun ParkingFinderApp() {
                             }
                         }
                         Spacer(Modifier.height(10.dp))
-                        Text(status, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                        Text(status, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)\n                        Text(bleBeaconText, color = Color(0xFF75D5C2), style = MaterialTheme.typography.bodySmall)
                         Text(
                             if (selectedDeviceName.isBlank()) "차량 블루투스를 등록하면 연결 해제 시 주차 위치를 기록합니다."
                             else "감지 차량: $selectedDeviceName",
@@ -177,7 +177,7 @@ private fun ParkingFinderApp() {
                         Button(onClick = {
                             if (Build.VERSION.SDK_INT >= 31 &&
                                 ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
-                                bluetoothPermission.launch(Manifest.permission.BLUETOOTH_CONNECT)
+                                bluetoothPermission.launch(if (Build.VERSION.SDK_INT >= 31) arrayOf(Manifest.permission.BLUETOOTH_CONNECT, Manifest.permission.BLUETOOTH_SCAN) else emptyArray())
                             } else {
                                 pairedDevices = getPairedDevices()
                                 showDevices = true
