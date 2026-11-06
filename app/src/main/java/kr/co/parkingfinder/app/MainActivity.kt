@@ -171,8 +171,8 @@ private fun ParkingFinderApp() {
                         }
                         SectionedParkingMap(
                             selectedBay = selectedParkingBay,
-                            lastSavedBay = if ((prefs.getString("last_detected_floor", "") ?: "") == selectedFloor)
-                                prefs.getString("last_detected_bay", "") ?: "" else "",
+                            lastSavedBay = if ((prefs.getString("manual_saved_floor", "") ?: "") == selectedFloor)
+                                prefs.getString("manual_saved_bay", "") ?: "" else "",
                             facilityByZone = listOf("A", "B", "C", "D").associateWith {
                                 prefs.getString("facility_${selectedFloor}_$it", "없음") ?: "없음"
                             },
@@ -269,11 +269,13 @@ private fun ParkingFinderApp() {
                                     val history = (prefs.getStringSet("parking_history", emptySet()) ?: emptySet()).toMutableSet()
                                     history.add("$time  |  $spot  |  직접 저장")
                                     prefs.edit()
-                                        .putString("last_detected_floor", selectedFloor)
-                                        .putString("last_detected_zone", zone)
-                                        .putString("last_detected_bay", selectedParkingBay)
+                                        .putString("manual_saved_floor", selectedFloor)
+                                        .putString("manual_saved_zone", zone)
+                                        .putString("manual_saved_bay", selectedParkingBay)
+                                        .putString("manual_saved_spot", spot)
+                                        .putString("manual_saved_time", time)
                                         .putString("selected_bay_$selectedFloor", selectedParkingBay)
-                                        .putString("last_detected_spot", spot)
+                                        .putString("last_detected_spot", "마지막 직접 저장 위치: $spot")
                                         .putString("last_location", spot)
                                         .putString("last_time", time)
                                         .putString("selected_floor", selectedFloor)
