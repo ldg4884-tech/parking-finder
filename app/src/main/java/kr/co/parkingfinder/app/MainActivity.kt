@@ -63,6 +63,8 @@ private fun ParkingFinderApp() {
     var status by remember { mutableStateOf(prefs.getString("monitor_status", "주차 감지 준비") ?: "") }
     var selectedDeviceName by remember { mutableStateOf(prefs.getString("car_bt_name", "") ?: "") }
     var bleBeaconText by remember { mutableStateOf(prefs.getString("latest_ble_beacon", "실내 비콘 신호 대기 중") ?: "실내 비콘 신호 대기 중") }
+    var beaconZoneLabel by remember { mutableStateOf("") }
+    var detectedSpotText by remember { mutableStateOf(prefs.getString("last_detected_spot", "아직 비콘으로 확인된 주차 구역이 없습니다") ?: "") }
     val activity = context as? ComponentActivity
     DisposableEffect(activity) {
         val observer = LifecycleEventObserver { _, event ->
@@ -73,6 +75,7 @@ private fun ParkingFinderApp() {
                 status = prefs.getString("monitor_status", "주차 감지 준비") ?: "주차 감지 준비"
                 selectedDeviceName = prefs.getString("car_bt_name", "") ?: ""
                 bleBeaconText = prefs.getString("latest_ble_beacon", "실내 비콘 신호 대기 중") ?: "실내 비콘 신호 대기 중"
+                detectedSpotText = prefs.getString("last_detected_spot", "아직 비콘으로 확인된 주차 구역이 없습니다") ?: ""
             }
         }
         activity?.lifecycle?.addObserver(observer)
@@ -177,6 +180,33 @@ private fun ParkingFinderApp() {
                         )
                         Spacer(Modifier.height(8.dp))
                         Text(bleBeaconText, color = Color(0xFF75D5C2), style = MaterialTheme.typography.bodySmall)
+                        OutlinedTextField(
+                            value = beaconZoneLabel,
+                            onValueChange = { beaconZoneLabel = it },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            label = { Text("주차 구역 이름 (예: 125번)") },
+                            placeholder = { Text("현재 도면에 표시된 위치에 비콘 연결") }
+                        )
+                        OutlinedButton(
+                            onClick = {
+                                val address = prefs.getString("latest_ble_address", null)
+                                if (address.isNullOrBlank()) {
+                                    status = "먼저 BLE 비콘 신호를 수신해 주세요."
+                                } else if (markerX < 0f || markerY < 0f) {
+                                    status = "먼저 선택한 층 도면을 눌러 위치를 표시해 주세요."
+                                } else if (beaconZoneLabel.isBlank()) {
+                                    status = "주차 구역 이름을 입력해 주세요."
+                                } else {
+                                    val mapping = "$selectedFloor|${beaconZoneLabel.trim()}|$markerX|$markerY"
+                                    prefs.edit().putString("beacon_map_$address", mapping).apply()
+                                    status = "$selectedFloor ${beaconZoneLabel.trim()} 구역에 현재 비콘을 등록했습니다."
+                                    detectedSpotText = "$selectedFloor ${beaconZoneLabel.trim()} · 비콘 등록 완료"
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) { Text("현재 비콘을 이 주차 위치에 등록") }
+                        Text(detectedSpotText, color = Color(0xFF9CE8D8), style = MaterialTheme.typography.bodySmall)
                         Spacer(Modifier.height(12.dp))
                         Button(onClick = {
                             if (Build.VERSION.SDK_INT >= 31 &&
