@@ -105,7 +105,6 @@ class CarBluetoothMonitorService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         startForeground(1001, buildNotification("차량 블루투스 연결 감지 중 · 위치 수집 준비"))
         startLocationUpdates()
-        startBleScanning()
         return START_STICKY
     }
 
