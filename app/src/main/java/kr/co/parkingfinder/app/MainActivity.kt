@@ -27,7 +27,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Bluetooth
-import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.MyLocation
@@ -139,7 +138,7 @@ private fun ParkingFinderApp() {
             val recognizer = TextRecognition.getClient(KoreanTextRecognizerOptions.Builder().build())
             recognizer.process(InputImage.fromBitmap(bitmap, 0))
                 .addOnSuccessListener { visionText ->
-                    val lines = visionText.textBlocks.flatMap { block -> block.lines }.map { it.text.trim() }
+                    val lines: List<String> = visionText.textBlocks.mapNotNull { block -> block.text.trim().takeIf { value -> value.isNotEmpty() } }
                     val candidate = lines.firstOrNull { line ->
                         line.any { it.isDigit() } && line.length <= 30
                     } ?: lines.firstOrNull { it.isNotBlank() }
@@ -150,7 +149,6 @@ private fun ParkingFinderApp() {
                         status = "인식 결과를 입력란에 넣었습니다. 확인 후 저장해 주세요."
                     }
                     ocrBusy = false
-                    recognizer.close()
                 }
                 .addOnFailureListener {
                     status = "문자 인식에 실패했습니다. 다시 촬영해 주세요."
@@ -233,8 +231,7 @@ private fun ParkingFinderApp() {
                             enabled = !ocrBusy,
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Icon(Icons.Default.CameraAlt, null)
-                            Text(if (ocrBusy) "번호 인식 중..." else "기둥 번호 카메라로 촬영")
+                            Text("📷  " + if (ocrBusy) "번호 인식 중..." else "기둥 번호 카메라로 촬영")
                         }
                         Button(
                             onClick = {
