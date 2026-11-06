@@ -172,10 +172,10 @@ private fun ParkingFinderApp() {
                         SectionedParkingMap(
                             selectedBay = selectedParkingBay,
                             facilityByZone = listOf("A", "B", "C", "D").associateWith {
-                                prefs.getString("facility_\${selectedFloor}_$it", "없음") ?: "없음"
+                                prefs.getString("facility_${selectedFloor}_$it", "없음") ?: "없음"
                             },
                             pillarsByZone = listOf("A", "B", "C", "D").associateWith {
-                                prefs.getString("pillars_\${selectedFloor}_$it", "") ?: ""
+                                prefs.getString("pillars_${selectedFloor}_$it", "") ?: ""
                             },
                             onSelect = { bay ->
                                 selectedParkingBay = bay
@@ -183,11 +183,11 @@ private fun ParkingFinderApp() {
                                 status = "$selectedFloor $bay 위치 선택됨"
                             },
                             onFacilityChange = { zone, facility ->
-                                prefs.edit().putString("facility_\${selectedFloor}_$zone", facility).apply()
+                                prefs.edit().putString("facility_${selectedFloor}_$zone", facility).apply()
                                 status = "$zone 구역 시설 위치 저장"
                             },
                             onPillarChange = { zone, pillar ->
-                                prefs.edit().putString("pillars_\${selectedFloor}_$zone", pillar).apply()
+                                prefs.edit().putString("pillars_${selectedFloor}_$zone", pillar).apply()
                             },
                             modifier = Modifier.fillMaxWidth()
                         )
@@ -394,12 +394,12 @@ private fun SectionedParkingMap(
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically) {
                         Text("$zone 구역", color = Color(0xFF75D5C2), fontWeight = FontWeight.Bold)
-                        Text("시설: \${facilityByZone[zone] ?: "없음"}",
+                        Text("시설: ${facilityByZone[zone] ?: "없음"}",
                             color = Color(0xFFD8E2ED), style = MaterialTheme.typography.labelSmall)
                     }
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
                         (1..3).forEach { number ->
-                            ParkingBay("$zone-\${number.toString().padStart(2, '0')}",
+                            ParkingBay("$zone-${number.toString().padStart(2, '0')}",
                                 selectedBay, onSelect, Modifier.weight(1f))
                         }
                     }
@@ -412,7 +412,7 @@ private fun SectionedParkingMap(
                     }
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
                         (4..6).forEach { number ->
-                            ParkingBay("$zone-\${number.toString().padStart(2, '0')}",
+                            ParkingBay("$zone-${number.toString().padStart(2, '0')}",
                                 selectedBay, onSelect, Modifier.weight(1f))
                         }
                     }
@@ -439,7 +439,7 @@ private fun SectionedParkingMap(
                 }
             }
         }
-        Text("선택된 주차면: \${selectedBay.ifBlank { "없음" }}",
+        Text("선택된 주차면: ${selectedBay.ifBlank { "없음" }}",
             color = Color(0xFF75D5C2), style = MaterialTheme.typography.bodySmall)
         Text("※ 현재는 임시 구역 배치입니다. 실제 통로·주차면·시설 위치를 확인해 조정해야 합니다.",
             color = Color(0xFFFFC978), style = MaterialTheme.typography.labelSmall)
