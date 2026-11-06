@@ -5,7 +5,7 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
-import android.bluetooth.BluetoothDevice
+import android.bluetooth.BluetoothDevice\nimport android.bluetooth.BluetoothAdapter\nimport android.bluetooth.le.ScanCallback\nimport android.bluetooth.le.ScanResult\nimport android.bluetooth.le.ScanSettings
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -26,7 +26,7 @@ import java.util.Locale
 class CarBluetoothMonitorService : Service() {
     private val channelId = "parking_monitor"
     private var receiverRegistered = false
-    private var locationUpdatesStarted = false
+    private var locationUpdatesStarted = false\n    private var bleScanStarted = false\n\n    private val bleScanCallback = object : ScanCallback() {\n        override fun onScanResult(callbackType: Int, result: ScanResult) {\n            val device = result.device\n            val address = try { device.address } catch (_: SecurityException) { return }\n            val name = try { device.name ?: result.scanRecord?.deviceName ?: "이름 없는 비콘" } catch (_: SecurityException) { "BLE 비콘" }\n            val prefs = getSharedPreferences("parking_finder", MODE_PRIVATE)\n            val previousRssi = prefs.getInt("latest_ble_rssi", Int.MIN_VALUE)\n            val previousTime = prefs.getLong("latest_ble_time", 0L)\n            val isBetter = result.rssi > previousRssi || System.currentTimeMillis() - previousTime > 15_000L\n            if (isBetter) {\n                prefs.edit().putString("latest_ble_address", address)\n                    .putString("latest_ble_name", name).putInt("latest_ble_rssi", result.rssi)\n                    .putLong("latest_ble_time", System.currentTimeMillis())\n                    .putString("latest_ble_beacon", "실내 비콘: $name · 신호 ${result.rssi} dBm").apply()\n            }\n        }\n        override fun onScanFailed(errorCode: Int) {\n            getSharedPreferences("parking_finder", MODE_PRIVATE).edit()\n                .putString("latest_ble_beacon", "실내 비콘 검색 실패 (코드 $errorCode)").apply()\n        }\n    }
 
     private val locationListener = object : LocationListener {
         override fun onLocationChanged(location: Location) {
@@ -101,7 +101,7 @@ class CarBluetoothMonitorService : Service() {
         if (started) updateNotification("차량 연결 감지 중 · 최근 위치를 주기적으로 수집")
     }
 
-    private fun registerBluetoothReceiver() {
+    private fun startBleScanning() {\n        if (bleScanStarted) return\n        if (Build.VERSION.SDK_INT >= 31 && checkSelfPermission(Manifest.permission.BLUETOOTH_SCAN) != PackageManager.PERMISSION_GRANTED) {\n            getSharedPreferences("parking_finder", MODE_PRIVATE).edit()\n                .putString("latest_ble_beacon", "실내 비콘 검색 권한이 필요합니다").apply()\n            return\n        }\n        try {\n            val scanner = BluetoothAdapter.getDefaultAdapter()?.bluetoothLeScanner ?: return\n            val settings = ScanSettings.Builder().setScanMode(ScanSettings.SCAN_MODE_LOW_POWER).build()\n            scanner.startScan(null, settings, bleScanCallback)\n            bleScanStarted = true\n            updateNotification("차량 연결 감지 중 · GPS 및 실내 BLE 비콘 검색")\n        } catch (_: SecurityException) {\n            getSharedPreferences("parking_finder", MODE_PRIVATE).edit()\n                .putString("latest_ble_beacon", "블루투스 검색 권한을 확인해 주세요").apply()\n        } catch (_: Exception) {\n            getSharedPreferences("parking_finder", MODE_PRIVATE).edit()\n                .putString("latest_ble_beacon", "이 기기에서 BLE 검색을 시작할 수 없습니다").apply()\n        }\n    }\n\n    private fun registerBluetoothReceiver() {
         if (receiverRegistered) return
         val filter = IntentFilter(BluetoothDevice.ACTION_ACL_DISCONNECTED)
         if (Build.VERSION.SDK_INT >= 33) {
