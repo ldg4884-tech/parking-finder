@@ -199,7 +199,10 @@ private fun ParkingFinderApp() {
                                     status = "주차 구역 이름을 입력해 주세요."
                                 } else {
                                     val mapping = "$selectedFloor|${beaconZoneLabel.trim()}|$markerX|$markerY"
-                                    prefs.edit().putString("beacon_map_$address", mapping).apply()
+                                    prefs.edit().putString("beacon_map_$address", mapping)
+                                        .putString("latest_mapped_ble_address", address)
+                                        .putInt("latest_mapped_ble_rssi", prefs.getInt("latest_ble_rssi", Int.MIN_VALUE))
+                                        .putLong("latest_mapped_ble_time", System.currentTimeMillis()).apply()
                                     status = "$selectedFloor ${beaconZoneLabel.trim()} 구역에 현재 비콘을 등록했습니다."
                                     detectedSpotText = "$selectedFloor ${beaconZoneLabel.trim()} · 비콘 등록 완료"
                                 }
