@@ -180,6 +180,12 @@ private fun ParkingFinderApp() {
                             facilityPositionByZone = listOf("A", "B", "C", "D").associateWith {
                                 prefs.getString("facility_position_${selectedFloor}_$it", "중앙 상단") ?: "중앙 상단"
                             },
+                            zoneNameByZone = listOf("A", "B", "C", "D").associateWith {
+                                prefs.getString("zone_name_${selectedFloor}_$it", "$it 구역") ?: "$it 구역"
+                            },
+                            bayCountByZone = listOf("A", "B", "C", "D").associateWith {
+                                prefs.getInt("bay_count_${selectedFloor}_$it", 6)
+                            },
                             onSelect = { bay ->
                                 selectedParkingBay = bay
                                 prefs.edit().putString("selected_bay_$selectedFloor", bay).apply()
@@ -195,6 +201,12 @@ private fun ParkingFinderApp() {
                             onFacilityPositionChange = { zone, position ->
                                 prefs.edit().putString("facility_position_${selectedFloor}_$zone", position).apply()
                                 status = "$zone 구역 시설 위치를 $position(으)로 저장"
+                            },
+                            onZoneNameChange = { zone, name ->
+                                prefs.edit().putString("zone_name_${selectedFloor}_$zone", name).apply()
+                            },
+                            onBayCountChange = { zone, count ->
+                                prefs.edit().putInt("bay_count_${selectedFloor}_$zone", count).apply()
                             },
                             modifier = Modifier.fillMaxWidth()
                         )
@@ -376,10 +388,14 @@ private fun SectionedParkingMap(
     facilityByZone: Map<String, String>,
     pillarsByZone: Map<String, String>,
     facilityPositionByZone: Map<String, String>,
+    zoneNameByZone: Map<String, String>,
+    bayCountByZone: Map<String, Int>,
     onSelect: (String) -> Unit,
     onFacilityChange: (String, String) -> Unit,
     onPillarChange: (String, String) -> Unit,
     onFacilityPositionChange: (String, String) -> Unit,
+    onZoneNameChange: (String, String) -> Unit,
+    onBayCountChange: (String, Int) -> Unit,
     modifier: Modifier = Modifier
 ) {
     Column(modifier, verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -393,21 +409,50 @@ private fun SectionedParkingMap(
             color = Color(0xFF9BAABD), style = MaterialTheme.typography.bodySmall)
         listOf("A", "B", "C", "D").forEach { zone ->
             var expanded by remember(zone) { mutableStateOf(false) }
+            var countExpanded by remember(zone) { mutableStateOf(false) }
+            var zoneName by remember(zone, zoneNameByZone[zone]) {
+                mutableStateOf(zoneNameByZone[zone] ?: "$zone 구역")
+            }
             var pillarText by remember(zone, pillarsByZone[zone]) {
                 mutableStateOf(pillarsByZone[zone] ?: "")
             }
+            val bayCount = (bayCountByZone[zone] ?: 6).coerceIn(2, 12)
+            val upperCount = bayCount / 2
             Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF1D2D40)),
                 shape = RoundedCornerShape(14.dp)) {
                 Column(Modifier.fillMaxWidth().padding(10.dp),
                     verticalArrangement = Arrangement.spacedBy(7.dp)) {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically) {
-                        Text("$zone 구역", color = Color(0xFF75D5C2), fontWeight = FontWeight.Bold)
+                        Text(zoneName.ifBlank { "$zone 구역" }, color = Color(0xFF75D5C2), fontWeight = FontWeight.Bold)
                         Text("시설: ${facilityByZone[zone] ?: "없음"}",
                             color = Color(0xFFD8E2ED), style = MaterialTheme.typography.labelSmall)
                     }
+                    OutlinedTextField(
+                        value = zoneName,
+                        onValueChange = { zoneName = it; onZoneNameChange(zone, it) },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        label = { Text("구역 이름") },
+                        placeholder = { Text("예: 엘리베이터 앞, 출입구 쪽") }
+                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        OutlinedButton(onClick = { countExpanded = true }) {
+                            Text("주차면 수: $bayCount")
+                        }
+                        DropdownMenu(expanded = countExpanded, onDismissRequest = { countExpanded = false }) {
+                            listOf(2, 4, 6, 8, 10, 12).forEach { count ->
+                                DropdownMenuItem(text = { Text("$count면") }, onClick = {
+                                    onBayCountChange(zone, count)
+                                    countExpanded = false
+                                })
+                            }
+                        }
+                        Text("구역별 주차면 수 조정", color = Color(0xFF9BAABD),
+                            style = MaterialTheme.typography.labelSmall)
+                    }
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                        (1..3).forEach { number ->
+                        (1..upperCount).forEach { number ->
                             ParkingBay("$zone-${number.toString().padStart(2, '0')}",
                                 selectedBay, onSelect, Modifier.weight(1f))
                         }
@@ -420,7 +465,7 @@ private fun SectionedParkingMap(
                         }
                     }
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                        (4..6).forEach { number ->
+                        (upperCount + 1..bayCount).forEach { number ->
                             ParkingBay("$zone-${number.toString().padStart(2, '0')}",
                                 selectedBay, onSelect, Modifier.weight(1f))
                         }
