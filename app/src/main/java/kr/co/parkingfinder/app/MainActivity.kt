@@ -245,7 +245,7 @@ private fun ParkingFinderApp() {
                                 locationPermission.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION))
                             } else if (Build.VERSION.SDK_INT >= 31 &&
                                 (ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED)) {
-                                bluetoothPermission.launch(arrayOf(Manifest.permission.BLUETOOTH_CONNECT, Manifest.permission.BLUETOOTH_SCAN))
+                                bluetoothPermission.launch(arrayOf(Manifest.permission.BLUETOOTH_CONNECT))
                             } else {
                                 ContextCompat.startForegroundService(context, Intent(context, CarBluetoothMonitorService::class.java))
                                 status = "차량 블루투스 연결 감지 중"
