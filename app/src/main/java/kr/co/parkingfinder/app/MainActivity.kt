@@ -177,6 +177,9 @@ private fun ParkingFinderApp() {
                             pillarsByZone = listOf("A", "B", "C", "D").associateWith {
                                 prefs.getString("pillars_${selectedFloor}_$it", "") ?: ""
                             },
+                            facilityPositionByZone = listOf("A", "B", "C", "D").associateWith {
+                                prefs.getString("facility_position_${selectedFloor}_$it", "중앙 상단") ?: "중앙 상단"
+                            },
                             onSelect = { bay ->
                                 selectedParkingBay = bay
                                 prefs.edit().putString("selected_bay_$selectedFloor", bay).apply()
@@ -188,6 +191,10 @@ private fun ParkingFinderApp() {
                             },
                             onPillarChange = { zone, pillar ->
                                 prefs.edit().putString("pillars_${selectedFloor}_$zone", pillar).apply()
+                            },
+                            onFacilityPositionChange = { zone, position ->
+                                prefs.edit().putString("facility_position_${selectedFloor}_$zone", position).apply()
+                                status = "$zone 구역 시설 위치를 $position(으)로 저장"
                             },
                             modifier = Modifier.fillMaxWidth()
                         )
@@ -368,9 +375,11 @@ private fun SectionedParkingMap(
     selectedBay: String,
     facilityByZone: Map<String, String>,
     pillarsByZone: Map<String, String>,
+    facilityPositionByZone: Map<String, String>,
     onSelect: (String) -> Unit,
     onFacilityChange: (String, String) -> Unit,
     onPillarChange: (String, String) -> Unit,
+    onFacilityPositionChange: (String, String) -> Unit,
     modifier: Modifier = Modifier
 ) {
     Column(modifier, verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -380,7 +389,7 @@ private fun SectionedParkingMap(
             Text("편집 가능한 개념도", color = Color(0xFFFFC978),
                 style = MaterialTheme.typography.labelSmall)
         }
-        Text("층별 A~D 구역의 시설 위치와 기둥 번호를 설정할 수 있습니다.",
+        Text("시설 종류를 선택한 뒤 6칸 배치도에서 실제 위치를 지정하고 기둥 번호를 입력하세요.",
             color = Color(0xFF9BAABD), style = MaterialTheme.typography.bodySmall)
         listOf("A", "B", "C", "D").forEach { zone ->
             var expanded by remember(zone) { mutableStateOf(false) }
@@ -417,7 +426,7 @@ private fun SectionedParkingMap(
                         }
                     }
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        OutlinedButton(onClick = { expanded = true }) { Text("시설 위치 설정") }
+                        OutlinedButton(onClick = { expanded = true }) { Text("시설 종류 선택") }
                         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
                             listOf("없음", "엘리베이터", "출입구", "램프").forEach { facility ->
                                 DropdownMenuItem(text = { Text(facility) }, onClick = {
@@ -426,9 +435,34 @@ private fun SectionedParkingMap(
                                 })
                             }
                         }
-                        Spacer(Modifier.width(8.dp))
-                        Text("이 구역에 시설 배치", color = Color(0xFF9BAABD),
-                            style = MaterialTheme.typography.labelSmall)
+                    }
+                    Text("아래 배치도에서 시설이 있는 칸을 선택하세요.",
+                        color = Color(0xFF9BAABD), style = MaterialTheme.typography.labelSmall)
+                    val positions = listOf("좌측 상단", "중앙 상단", "우측 상단",
+                        "좌측 하단", "중앙 하단", "우측 하단")
+                    positions.chunked(3).forEach { rowPositions ->
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                            rowPositions.forEach { position ->
+                                val active = facilityPositionByZone[zone] == position
+                                Surface(
+                                    onClick = { onFacilityPositionChange(zone, position) },
+                                    modifier = Modifier.weight(1f).height(38.dp),
+                                    color = if (active) Color(0xFF24564D) else Color(0xFF24364A),
+                                    shape = RoundedCornerShape(7.dp),
+                                    border = androidx.compose.foundation.BorderStroke(
+                                        1.dp, if (active) Color(0xFF75D5C2) else Color(0xFF40536A))
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Text(
+                                            if (active && (facilityByZone[zone] ?: "없음") != "없음")
+                                                "◆ ${facilityByZone[zone]}" else position,
+                                            color = if (active) Color(0xFF9CE8D8) else Color(0xFFE6EDF5),
+                                            style = MaterialTheme.typography.labelSmall
+                                        )
+                                    }
+                                }
+                            }
+                        }
                     }
                     OutlinedTextField(value = pillarText, onValueChange = {
                         pillarText = it
