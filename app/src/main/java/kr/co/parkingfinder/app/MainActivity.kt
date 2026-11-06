@@ -61,7 +61,8 @@ private fun ParkingFinderApp() {
     var savedAt by remember { mutableStateOf(prefs.getString("last_time", "") ?: "") }
     var hasLocation by remember { mutableStateOf(savedAt.isNotBlank()) }
     var status by remember { mutableStateOf(prefs.getString("monitor_status", "주차 감지 준비") ?: "") }
-    var selectedDeviceName by remember { mutableStateOf(prefs.getString("car_bt_name", "") ?: "") }\n    var bleBeaconText by remember { mutableStateOf(prefs.getString("latest_ble_beacon", "실내 비콘 신호 대기 중") ?: "실내 비콘 신호 대기 중") }
+    var selectedDeviceName by remember { mutableStateOf(prefs.getString("car_bt_name", "") ?: "") }
+    var bleBeaconText by remember { mutableStateOf(prefs.getString("latest_ble_beacon", "실내 비콘 신호 대기 중") ?: "실내 비콘 신호 대기 중") }
     val activity = context as? ComponentActivity
     DisposableEffect(activity) {
         val observer = LifecycleEventObserver { _, event ->
@@ -70,7 +71,8 @@ private fun ParkingFinderApp() {
                 savedAt = prefs.getString("last_time", "") ?: ""
                 hasLocation = savedAt.isNotBlank()
                 status = prefs.getString("monitor_status", "주차 감지 준비") ?: "주차 감지 준비"
-                selectedDeviceName = prefs.getString("car_bt_name", "") ?: ""\n                bleBeaconText = prefs.getString("latest_ble_beacon", "실내 비콘 신호 대기 중") ?: "실내 비콘 신호 대기 중"
+                selectedDeviceName = prefs.getString("car_bt_name", "") ?: ""
+                bleBeaconText = prefs.getString("latest_ble_beacon", "실내 비콘 신호 대기 중") ?: "실내 비콘 신호 대기 중"
             }
         }
         activity?.lifecycle?.addObserver(observer)
