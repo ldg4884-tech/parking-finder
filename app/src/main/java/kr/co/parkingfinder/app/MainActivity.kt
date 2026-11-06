@@ -7,7 +7,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.location.Location
 import android.location.LocationManager
-import android.graphics.BitmapFactory
+import android.graphics.Bitmap\nimport android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.compose.foundation.Image
 import androidx.compose.ui.graphics.asImageBitmap
@@ -25,7 +25,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Bluetooth
+import androidx.compose.material.icons.filled.Bluetooth\nimport androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.MyLocation
@@ -43,7 +43,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import java.text.SimpleDateFormat
 import java.util.Date
-import java.util.Locale
+import java.util.Locale\nimport com.google.mlkit.vision.common.InputImage\nimport com.google.mlkit.vision.text.TextRecognition\nimport com.google.mlkit.vision.text.korean.KoreanTextRecognizerOptions
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -63,7 +63,7 @@ private fun ParkingFinderApp() {
     var status by remember { mutableStateOf(prefs.getString("monitor_status", "주차 감지 준비") ?: "") }
     var selectedDeviceName by remember { mutableStateOf(prefs.getString("car_bt_name", "") ?: "") }
     var bleBeaconText by remember { mutableStateOf(prefs.getString("latest_ble_beacon", "실내 비콘 신호 대기 중") ?: "실내 비콘 신호 대기 중") }
-    var manualZoneLabel by remember { mutableStateOf(prefs.getString("last_detected_zone", "") ?: "") }
+    var manualZoneLabel by remember { mutableStateOf(prefs.getString("last_detected_zone", "") ?: "") }\n    var ocrBusy by remember { mutableStateOf(false) }
     var detectedSpotText by remember { mutableStateOf(prefs.getString("last_detected_spot", "아직 비콘으로 확인된 주차 구역이 없습니다") ?: "") }
     val activity = context as? ComponentActivity
     DisposableEffect(activity) {
@@ -119,6 +119,38 @@ private fun ParkingFinderApp() {
             } catch (_: Exception) {
                 status = "도면을 저장하지 못했습니다. 다시 선택해 주세요."
             }
+        }
+    }
+
+    val pillarCamera = rememberLauncherForActivityResult(
+        ActivityResultContracts.TakePicturePreview()
+    ) { bitmap ->
+        if (bitmap == null) {
+            status = "촬영이 취소되었습니다."
+        } else {
+            ocrBusy = true
+            status = "기둥 번호를 읽는 중입니다."
+            val recognizer = TextRecognition.getClient(KoreanTextRecognizerOptions.Builder().build())
+            recognizer.process(InputImage.fromBitmap(bitmap, 0))
+                .addOnSuccessListener { visionText ->
+                    val lines = visionText.textBlocks.flatMap { block -> block.lines }.map { it.text.trim() }
+                    val candidate = lines.firstOrNull { line ->
+                        line.any { it.isDigit() } && line.length <= 30
+                    } ?: lines.firstOrNull { it.isNotBlank() }
+                    if (candidate.isNullOrBlank()) {
+                        status = "번호를 읽지 못했습니다. 밝게 촬영하고 다시 시도해 주세요."
+                    } else {
+                        manualZoneLabel = candidate
+                        status = "인식 결과를 입력란에 넣었습니다. 확인 후 저장해 주세요."
+                    }
+                    ocrBusy = false
+                    recognizer.close()
+                }
+                .addOnFailureListener {
+                    status = "문자 인식에 실패했습니다. 다시 촬영해 주세요."
+                    ocrBusy = false
+                    recognizer.close()
+                }
         }
     }
 
@@ -190,6 +222,14 @@ private fun ParkingFinderApp() {
                             label = { Text("주차 위치 / 기둥 번호") },
                             placeholder = { Text("예: 125번 기둥, A구역 12번") }
                         )
+                        OutlinedButton(
+                            onClick = { pillarCamera.launch(null) },
+                            enabled = !ocrBusy,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(Icons.Default.CameraAlt, null)
+                            Text(if (ocrBusy) "번호 인식 중..." else "기둥 번호 카메라로 촬영")
+                        }
                         Button(
                             onClick = {
                                 if (manualZoneLabel.isBlank()) {
