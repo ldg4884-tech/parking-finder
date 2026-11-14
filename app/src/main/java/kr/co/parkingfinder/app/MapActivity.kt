@@ -148,7 +148,7 @@ class MapActivity : ComponentActivity(), SensorEventListener, LocationListener {
             }
             return JSONObject()
                 .put("loc", p.getString("last_location", "") ?: "")
-                .put("time", p.getString("last_time", "") ?: "")
+                .put("time", p.getString("last_auto_parking_time", "") ?: "")
                 .put("floorKey", floor)
                 .put("x", p.getFloat("last_detected_marker_x", -1f).toDouble())
                 .put("y", p.getFloat("last_detected_marker_y", -1f).toDouble())
