@@ -64,7 +64,7 @@ function poll(){if(!window.Android)return;try{const s=JSON.parse(Android.state()
  $('st').textContent=s.mode==='underground'?('지하 추정 · '+(s.floor?L[s.floor]:'층 확인 중')+' · 높이변화 '+s.rel+'m'):'지상(GPS) · 기압 '+s.hpa+'hPa';
  if(s.mode==='underground'&&s.floor&&s.floor!==cur&&Date.now()-manual>20000){cur=s.floor;build()}
  const a=JSON.parse(Android.lastAuto());
- if(a.time&&a.time!==autoSeenTime&&a.floorKey&&a.x>=0&&a.y>=0){autoSeenTime=a.time;autoSpot={k:a.floorKey,x:a.x,y:a.y,t:a.time};if(Date.now()-manual>20000){cur=a.floorKey;build()}else mark()}
+ if(a.time&&a.time!==autoSeenTime){autoSeenTime=a.time;if(a.floorKey&&a.x>=0&&a.y>=0){autoSpot={k:a.floorKey,x:a.x,y:a.y,t:a.time};if(Date.now()-manual>20000){cur=a.floorKey;build()}else mark()}else{autoSpot=null;mark()}}
  }catch(e){}}
 setInterval(poll,1000);
 if(sv&&D[sv.k])cur=sv.k;build();
