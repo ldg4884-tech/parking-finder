@@ -56,10 +56,9 @@ private fun ParkingFinderApp() {
     var hasLocation by remember { mutableStateOf(savedAt.isNotBlank()) }
     var status by remember { mutableStateOf(prefs.getString("monitor_status", "주차 감지 준비") ?: "") }
     var selectedDeviceName by remember { mutableStateOf(prefs.getString("car_bt_name", "") ?: "") }
-    var bleBeaconText by remember { mutableStateOf(prefs.getString("latest_ble_beacon", "실내 비콘 신호 대기 중") ?: "실내 비콘 신호 대기 중") }
     var manualZoneLabel by remember { mutableStateOf(prefs.getString("last_detected_zone", "") ?: "") }
     var ocrBusy by remember { mutableStateOf(false) }
-    var detectedSpotText by remember { mutableStateOf(prefs.getString("last_detected_spot", "아직 비콘으로 확인된 주차 구역이 없습니다") ?: "") }
+    var detectedSpotText by remember { mutableStateOf(prefs.getString("last_detected_spot", "아직 저장된 주차 구역이 없습니다") ?: "") }
     val activity = context as? ComponentActivity
     DisposableEffect(activity) {
         val observer = LifecycleEventObserver { _, event ->
@@ -69,7 +68,6 @@ private fun ParkingFinderApp() {
                 hasLocation = savedAt.isNotBlank()
                 status = prefs.getString("monitor_status", "주차 감지 준비") ?: "주차 감지 준비"
                 selectedDeviceName = prefs.getString("car_bt_name", "") ?: ""
-                bleBeaconText = prefs.getString("latest_ble_beacon", "비콘 없이 수동 위치 저장 가능") ?: "비콘 없이 수동 위치 저장 가능"
                 detectedSpotText = prefs.getString("last_detected_spot", "아직 저장된 주차 구역이 없습니다") ?: ""
                 manualZoneLabel = prefs.getString("last_detected_zone", "") ?: ""
             }
@@ -136,15 +134,6 @@ private fun ParkingFinderApp() {
             pairedDevices = getPairedDevices()
             showDevices = true
         } else status = "차량 블루투스 권한이 필요합니다"
-    }
-
-    val bleScanPermission = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { granted ->
-        ContextCompat.startForegroundService(context, Intent(context, CarBluetoothMonitorService::class.java))
-        status = if (granted) "차량 블루투스 및 실내 비콘 자동 감지 중"
-            else "차량 연결 해제와 GPS 기록 중 · BLE 비콘 검색은 권한이 없어 꺼져 있습니다"
-        prefs.edit().putString("monitor_status", status).apply()
     }
 
     MaterialTheme(colorScheme = darkColorScheme(
@@ -324,12 +313,9 @@ private fun ParkingFinderApp() {
                             } else if (Build.VERSION.SDK_INT >= 31 &&
                                 ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
                                 bluetoothPermission.launch(arrayOf(Manifest.permission.BLUETOOTH_CONNECT))
-                            } else if (Build.VERSION.SDK_INT >= 31 &&
-                                ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_SCAN) != PackageManager.PERMISSION_GRANTED) {
-                                bleScanPermission.launch(Manifest.permission.BLUETOOTH_SCAN)
                             } else {
                                 ContextCompat.startForegroundService(context, Intent(context, CarBluetoothMonitorService::class.java))
-                                status = "차량 블루투스 및 실내 비콘 자동 감지 중"
+                                status = "차량 블루투스 연결 해제 및 GPS 자동 기록 중"
                                 prefs.edit().putString("monitor_status", status).apply()
                             }
                         }, modifier = Modifier.fillMaxWidth()) {
