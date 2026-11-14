@@ -43,12 +43,13 @@ function mark(){let o='';const one=(i,c,car)=>{const s=S[i];o+='<rect x="'+(s[0]
 function go(x,y){const k=m.clientWidth/W;mp.scrollTo({left:x*k-mp.clientWidth/2,top:y*k-mp.clientHeight/2,behavior:'smooth'})}
 function zoom(v,x,y){z=Math.max(1,Math.min(5,v));m.style.width=z*100+'%';if(x!=null)requestAnimationFrame(()=>go(x,y))}
 function panel(){let p='';
- if(sel>=0)p+='<p><b>선택한 칸: '+L[cur]+' · 코어 '+core(sel)+' 근처</b></p><div class="row"><button class="pri" id="sv">여기에 주차했어요</button></div>';
+ if(sel>=0)p+='<p><b>선택한 칸: '+L[cur]+' · 코어 '+core(sel)+' 근처</b></p><div class="row"><button class="pri" id="sv">여기에 주차했어요</button></div><div class="row" style="margin-top:6px"><button id="mb">현재 감지된 비콘을 이 칸에 등록</button></div>';
  else if(sv){const sc=D[sv.k].c,s=D[sv.k].s[sv.i];let b=0,bd=1e9;for(const k in sc){const d=Math.hypot(sc[k][0]-s[0],sc[k][1]-s[1]);if(d<bd){bd=d;b=k}}
   p+='<p><b>내 차: '+L[sv.k]+' · 코어 '+b+' 근처</b><br><span class="mu">저장 '+when(sv.t)+'</span></p><div class="row"><button class="pri" id="fd">내 차 위치 보기</button><button class="dg" id="ck">지우기</button></div>'}
  else p+='<p>층을 고르고 지도를 확대해 내 차 칸을 탭하면 위치가 저장돼요.</p>';
  p+='<div class="mu" style="margin-top:8px">코어 번호는 층마다 임시 번호이고, 동 이름은 추후 반영해요.</div>';p+=au();if(window.Android)p+='<div class="row" style="margin-top:8px"><button id="cb">지금 이 층이에요</button><button id="op">블루투스·기록</button></div>';$('pn').innerHTML=p;const cb=$('cb');if(cb){cb.onclick=()=>{Android.calibrate(cur);manual=0};$('op').onclick=()=>Android.openSettings()};
  const a=$('sv');if(a)a.onclick=()=>{sv={k:cur,i:sel,t:Date.now()};try{localStorage.setItem('pk',JSON.stringify(sv))}catch(e){}if(window.Android&&Android.saveManual)Android.saveManual(cur,sel,core(sel),sv.t);sel=-1;mark();panel()};
+ const mb=$('mb');if(mb)mb.onclick=()=>{if(!window.Android||!Android.registerBeacon){$('st').textContent='비콘 등록 기능을 사용할 수 없습니다';return}const msg=Android.registerBeacon(cur,sel,core(sel),S[sel][0],S[sel][1]);$('st').textContent=msg};
  const f=$('fd');if(f)f.onclick=()=>{if(sv.k!==cur){cur=sv.k;build()}const s=D[sv.k].s[sv.i];zoom(4,s[0],s[1])};
  const c=$('ck');if(c)c.onclick=()=>{sv=null;try{localStorage.removeItem('pk')}catch(e){}if(window.Android&&Android.clearManual)Android.clearManual();mark();panel()}}
 m.addEventListener('click',e=>{const p=m.createSVGPoint();p.x=e.clientX;p.y=e.clientY;const q=p.matrixTransform(m.getScreenCTM().inverse());
