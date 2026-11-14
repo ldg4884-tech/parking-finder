@@ -237,6 +237,7 @@ class CarBluetoothMonitorService : Service() {
         history.add("$time  |  ${if (mapped) "$spotText · " else ""}$gpsText  |  차량 블루투스 해제 자동 기록")
 
         val editor = prefs.edit()
+            .putString("last_auto_parking_time", time)
             .putString("last_time", time)
             .putString("last_location", if (mapped) "$spotText · $gpsText" else "주차 시점 자동 기록됨 · $gpsText · 기둥 번호 확인 필요")
             .putString("monitor_status", status)
@@ -249,6 +250,11 @@ class CarBluetoothMonitorService : Service() {
                 .putFloat("last_detected_marker_x", markerX)
                 .putFloat("last_detected_marker_y", markerY)
                 .putString("selected_floor", floor)
+        } else {
+            editor.remove("last_detected_floor")
+                .remove("last_detected_zone")
+                .remove("last_detected_marker_x")
+                .remove("last_detected_marker_y")
         }
         editor.apply()
         updateNotification(status)
