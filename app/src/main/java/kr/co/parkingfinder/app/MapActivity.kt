@@ -118,40 +118,11 @@ class MapActivity : ComponentActivity(), SensorEventListener, LocationListener {
             prefs.edit().remove("map_saved_floor_key").remove("map_saved_slot_index")
                 .remove("map_saved_core").remove("map_saved_timestamp").apply()
         }
-        @JavascriptInterface fun registerBeacon(floorKey: String, slotIndex: Int, core: String, x: Float, y: Float): String {
-            if (floorKey !in setOf("a", "b", "c") || slotIndex < 0 || core.isBlank()) return "주차면 정보를 확인해 주세요."
-            val prefs = getSharedPreferences("parking_finder", MODE_PRIVATE)
-            val address = prefs.getString("latest_ble_address", null)
-                ?: return "주변에서 BLE 비콘을 찾지 못했습니다. 비콘 가까이에서 다시 시도해 주세요."
-            val seenAt = prefs.getLong("latest_ble_time", 0L)
-            if (System.currentTimeMillis() - seenAt > 30_000L) return "최근 30초 이내에 감지된 비콘이 없습니다. 다시 검색해 주세요."
-            val floorName = when (floorKey) {
-                "a" -> "지하1층-1"
-                "b" -> "지하1층-2"
-                else -> "지하2층"
-            }
-            val name = prefs.getString("latest_ble_name", "BLE 비콘") ?: "BLE 비콘"
-            prefs.edit()
-                .putString("beacon_map_$address", "$floorName|코어 $core|$x|$y")
-                .putString("beacon_map_name_$address", name)
-                .putLong("beacon_map_time_$address", System.currentTimeMillis())
-                .apply()
-            return "$name 비콘을 $floorName · 코어 $core 주변 주차면에 등록했습니다."
-        }
         @JavascriptInterface fun lastAuto(): String {
             val p = getSharedPreferences("parking_finder", MODE_PRIVATE)
-            val floor = when (p.getString("last_detected_floor", "") ?: "") {
-                "지하1층-1" -> "a"
-                "지하1층-2" -> "b"
-                "지하2층" -> "c"
-                else -> ""
-            }
             return JSONObject()
                 .put("loc", p.getString("last_location", "") ?: "")
                 .put("time", p.getString("last_auto_parking_time", "") ?: "")
-                .put("floorKey", floor)
-                .put("x", p.getFloat("last_detected_marker_x", -1f).toDouble())
-                .put("y", p.getFloat("last_detected_marker_y", -1f).toDouble())
                 .toString()
         }
         @JavascriptInterface fun openSettings() {
