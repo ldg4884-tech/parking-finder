@@ -88,6 +88,36 @@ class MapActivity : ComponentActivity(), SensorEventListener, LocationListener {
         @JavascriptInterface fun state(): String = est.json()
         @JavascriptInterface fun calibrate(key: String) { est.calibrate(key) }
         @JavascriptInterface fun hasBaro(): Boolean = baro != null
+        @JavascriptInterface fun saveManual(floorKey: String, slotIndex: Int, core: String, timestamp: Long) {
+            if (floorKey !in setOf("a", "b", "c") || slotIndex < 0 || core.isBlank()) return
+            val floorName = when (floorKey) {
+                "a" -> "지하1층-1"
+                "b" -> "지하1층-2"
+                else -> "지하2층"
+            }
+            val time = java.text.SimpleDateFormat("yyyy.MM.dd HH:mm", java.util.Locale.KOREA)
+                .format(java.util.Date(timestamp))
+            val spot = "$floorName · 코어 $core 인근 · 지도상 ${slotIndex + 1}번 주차면"
+            val prefs = getSharedPreferences("parking_finder", MODE_PRIVATE)
+            val history = (prefs.getStringSet("parking_history", emptySet()) ?: emptySet()).toMutableSet()
+            history.add("$time  |  $spot  |  지도에서 직접 저장")
+            prefs.edit()
+                .putString("map_saved_floor_key", floorKey)
+                .putInt("map_saved_slot_index", slotIndex)
+                .putString("map_saved_core", core)
+                .putLong("map_saved_timestamp", timestamp)
+                .putString("last_location", spot)
+                .putString("last_time", time)
+                .putString("last_detected_spot", "마지막 지도 저장 위치: $spot")
+                .putString("monitor_status", "$spot 위치 저장 완료")
+                .putStringSet("parking_history", history)
+                .apply()
+        }
+        @JavascriptInterface fun clearManual() {
+            val prefs = getSharedPreferences("parking_finder", MODE_PRIVATE)
+            prefs.edit().remove("map_saved_floor_key").remove("map_saved_slot_index")
+                .remove("map_saved_core").remove("map_saved_timestamp").apply()
+        }
         @JavascriptInterface fun lastAuto(): String {
             val p = getSharedPreferences("parking_finder", MODE_PRIVATE)
             return JSONObject().put("loc", p.getString("last_location", "") ?: "")
