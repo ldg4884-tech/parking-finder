@@ -40,7 +40,6 @@ const core=i=>{let b=0,bd=1e9;for(const k in C){const d=Math.hypot(C[k][0]-S[i][
 const when=t=>new Date(t).toLocaleString('ko-KR',{month:'numeric',day:'numeric',hour:'numeric',minute:'2-digit'});
 function mark(){let o='';const one=(i,c,car)=>{const s=S[i];o+='<rect x="'+(s[0]-s[2]/2-2)+'" y="'+(s[1]-s[3]/2-2)+'" width="'+(s[2]+4)+'" height="'+(s[3]+4)+'" rx="3" fill="'+c+'"/><circle class="ring" cx="'+s[0]+'" cy="'+s[1]+'" r="'+18*u+'" stroke="'+c+'"/>';if(car)o+='<text class="car" style="font-size:'+34*u+'px" x="'+s[0]+'" y="'+(s[1]-30*u)+'">🚗</text>'};
  const here=sv&&sv.k===cur;if(here)one(sv.i,'var(--rd)',1);if(sel>=0&&!(here&&sv.i===sel))one(sel,'var(--wa)',0);
- if(autoSpot&&autoSpot.k===cur){o+='<circle cx="'+autoSpot.x+'" cy="'+autoSpot.y+'" r="'+26*u+'" fill="none" stroke="#3988ff" stroke-width="'+7*u+'"/><text class="car" style="font-size:'+38*u+'px" x="'+autoSpot.x+'" y="'+autoSpot.y+'">🚙</text>'}
  $('mk').innerHTML=o}
 function go(x,y){const k=m.clientWidth/W;mp.scrollTo({left:x*k-mp.clientWidth/2,top:y*k-mp.clientHeight/2,behavior:'smooth'})}
 function zoom(v,x,y){z=Math.max(1,Math.min(5,v));m.style.width=z*100+'%';if(x!=null)requestAnimationFrame(()=>go(x,y))}
@@ -51,7 +50,6 @@ function panel(){let p='';
  else p+='<p>층을 고르고 지도를 확대해 내 차 칸을 탭하면 위치가 저장돼요.</p>';
  p+='<div class="mu" style="margin-top:8px">코어 번호는 층마다 임시 번호이고, 동 이름은 추후 반영해요.</div>';p+=au();if(window.Android)p+='<div class="row" style="margin-top:8px"><button id="cb">지금 이 층이에요</button><button id="op">블루투스·기록</button></div>';$('pn').innerHTML=p;const cb=$('cb');if(cb){cb.onclick=()=>{Android.calibrate(cur);manual=0};$('op').onclick=()=>Android.openSettings()};
  const a=$('sv');if(a)a.onclick=()=>{sv={k:cur,i:sel,t:Date.now()};try{localStorage.setItem('pk',JSON.stringify(sv))}catch(e){}if(window.Android&&Android.saveManual)Android.saveManual(cur,sel,core(sel),sv.t);sel=-1;mark();panel()};
- const mb=$('mb');if(mb)mb.onclick=()=>{if(!window.Android||!Android.registerBeacon){$('st').textContent='비콘 등록 기능을 사용할 수 없습니다';return}const msg=Android.registerBeacon(cur,sel,core(sel),S[sel][0],S[sel][1]);$('st').textContent=msg};
  const f=$('fd');if(f)f.onclick=()=>{if(sv.k!==cur){cur=sv.k;build()}const s=D[sv.k].s[sv.i];zoom(4,s[0],s[1])};
  const c=$('ck');if(c)c.onclick=()=>{sv=null;try{localStorage.removeItem('pk')}catch(e){}if(window.Android&&Android.clearManual)Android.clearManual();mark();panel()}}
 m.addEventListener('click',e=>{const p=m.createSVGPoint();p.x=e.clientX;p.y=e.clientY;const q=p.matrixTransform(m.getScreenCTM().inverse());
@@ -63,8 +61,6 @@ document.addEventListener('click',e=>{if(e.target.closest&&e.target.closest('#tb
 function poll(){if(!window.Android)return;try{const s=JSON.parse(Android.state());
  $('st').textContent=s.mode==='underground'?('지하 추정 · '+(s.floor?L[s.floor]:'층 확인 중')+' · 높이변화 '+s.rel+'m'):'지상(GPS) · 기압 '+s.hpa+'hPa';
  if(s.mode==='underground'&&s.floor&&s.floor!==cur&&Date.now()-manual>20000){cur=s.floor;build()}
- const a=JSON.parse(Android.lastAuto());
- if(a.time&&a.time!==autoSeenTime){autoSeenTime=a.time;if(a.floorKey&&a.x>=0&&a.y>=0){autoSpot={k:a.floorKey,x:a.x,y:a.y,t:a.time};if(Date.now()-manual>20000){cur=a.floorKey;build()}else mark()}else{autoSpot=null;mark()}}
  }catch(e){}}
 setInterval(poll,1000);
 if(sv&&D[sv.k])cur=sv.k;build();
