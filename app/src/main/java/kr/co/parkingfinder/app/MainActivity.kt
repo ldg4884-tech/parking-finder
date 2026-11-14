@@ -138,6 +138,15 @@ private fun ParkingFinderApp() {
         } else status = "차량 블루투스 권한이 필요합니다"
     }
 
+    val bleScanPermission = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        ContextCompat.startForegroundService(context, Intent(context, CarBluetoothMonitorService::class.java))
+        status = if (granted) "차량 블루투스 및 실내 비콘 자동 감지 중"
+            else "차량 연결 해제와 GPS 기록 중 · BLE 비콘 검색은 권한이 없어 꺼져 있습니다"
+        prefs.edit().putString("monitor_status", status).apply()
+    }
+
     MaterialTheme(colorScheme = darkColorScheme(
         primary = Color(0xFF75D5C2), background = Color(0xFF0D1420),
         surface = Color(0xFF172334), onBackground = Color(0xFFF4F7FA),
@@ -313,11 +322,14 @@ private fun ParkingFinderApp() {
                                 ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
                                 locationPermission.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION))
                             } else if (Build.VERSION.SDK_INT >= 31 &&
-                                (ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED)) {
+                                ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
                                 bluetoothPermission.launch(arrayOf(Manifest.permission.BLUETOOTH_CONNECT))
+                            } else if (Build.VERSION.SDK_INT >= 31 &&
+                                ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_SCAN) != PackageManager.PERMISSION_GRANTED) {
+                                bleScanPermission.launch(Manifest.permission.BLUETOOTH_SCAN)
                             } else {
                                 ContextCompat.startForegroundService(context, Intent(context, CarBluetoothMonitorService::class.java))
-                                status = "차량 블루투스 연결 감지 중"
+                                status = "차량 블루투스 및 실내 비콘 자동 감지 중"
                                 prefs.edit().putString("monitor_status", status).apply()
                             }
                         }, modifier = Modifier.fillMaxWidth()) {
