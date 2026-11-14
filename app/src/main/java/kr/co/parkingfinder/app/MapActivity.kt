@@ -140,8 +140,19 @@ class MapActivity : ComponentActivity(), SensorEventListener, LocationListener {
         }
         @JavascriptInterface fun lastAuto(): String {
             val p = getSharedPreferences("parking_finder", MODE_PRIVATE)
-            return JSONObject().put("loc", p.getString("last_location", "") ?: "")
-                .put("time", p.getString("last_time", "") ?: "").toString()
+            val floor = when (p.getString("last_detected_floor", "") ?: "") {
+                "지하1층-1" -> "a"
+                "지하1층-2" -> "b"
+                "지하2층" -> "c"
+                else -> ""
+            }
+            return JSONObject()
+                .put("loc", p.getString("last_location", "") ?: "")
+                .put("time", p.getString("last_time", "") ?: "")
+                .put("floorKey", floor)
+                .put("x", p.getFloat("last_detected_marker_x", -1f).toDouble())
+                .put("y", p.getFloat("last_detected_marker_y", -1f).toDouble())
+                .toString()
         }
         @JavascriptInterface fun openSettings() {
             runOnUiThread { startActivity(Intent(this@MapActivity, MainActivity::class.java)) }
