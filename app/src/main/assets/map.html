@@ -48,9 +48,9 @@ function panel(){let p='';
   p+='<p><b>내 차: '+L[sv.k]+' · 코어 '+b+' 근처</b><br><span class="mu">저장 '+when(sv.t)+'</span></p><div class="row"><button class="pri" id="fd">내 차 위치 보기</button><button class="dg" id="ck">지우기</button></div>'}
  else p+='<p>층을 고르고 지도를 확대해 내 차 칸을 탭하면 위치가 저장돼요.</p>';
  p+='<div class="mu" style="margin-top:8px">코어 번호는 층마다 임시 번호이고, 동 이름은 추후 반영해요.</div>';p+=au();if(window.Android)p+='<div class="row" style="margin-top:8px"><button id="cb">지금 이 층이에요</button><button id="op">블루투스·기록</button></div>';$('pn').innerHTML=p;const cb=$('cb');if(cb){cb.onclick=()=>{Android.calibrate(cur);manual=0};$('op').onclick=()=>Android.openSettings()};
- const a=$('sv');if(a)a.onclick=()=>{sv={k:cur,i:sel,t:Date.now()};try{localStorage.setItem('pk',JSON.stringify(sv))}catch(e){}sel=-1;mark();panel()};
- const f=$('fd');if(f)f.onclick=()=>{if(sv.k!==cur){cur=sv.k;build()}const s=S[sv.i];zoom(4,s[0],s[1])};
- const c=$('ck');if(c)c.onclick=()=>{sv=null;try{localStorage.removeItem('pk')}catch(e){}mark();panel()}}
+ const a=$('sv');if(a)a.onclick=()=>{sv={k:cur,i:sel,t:Date.now()};try{localStorage.setItem('pk',JSON.stringify(sv))}catch(e){}if(window.Android&&Android.saveManual)Android.saveManual(cur,sel,core(sel),sv.t);sel=-1;mark();panel()};
+ const f=$('fd');if(f)f.onclick=()=>{if(sv.k!==cur){cur=sv.k;build()}const s=D[sv.k].s[sv.i];zoom(4,s[0],s[1])};
+ const c=$('ck');if(c)c.onclick=()=>{sv=null;try{localStorage.removeItem('pk')}catch(e){}if(window.Android&&Android.clearManual)Android.clearManual();mark();panel()}}
 m.addEventListener('click',e=>{const p=m.createSVGPoint();p.x=e.clientX;p.y=e.clientY;const q=p.matrixTransform(m.getScreenCTM().inverse());
  if(z<2.5){zoom(4,q.x,q.y);return}
  let b=-1,bd=1e9;S.forEach((s,i)=>{const d=Math.hypot(s[0]-q.x,s[1]-q.y);if(d<bd){bd=d;b=i}});
