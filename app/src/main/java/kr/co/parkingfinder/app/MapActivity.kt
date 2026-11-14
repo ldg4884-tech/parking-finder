@@ -97,7 +97,7 @@ class MapActivity : ComponentActivity(), SensorEventListener, LocationListener {
             }
             val time = java.text.SimpleDateFormat("yyyy.MM.dd HH:mm", java.util.Locale.KOREA)
                 .format(java.util.Date(timestamp))
-            val spot = "$floorName · 코어 $core 인근 · 지도상 ${slotIndex + 1}번 주차면"
+            val spot = "$floorName · 지도 기준점 $core 인근 · 지도상 ${slotIndex + 1}번 주차면"
             val prefs = getSharedPreferences("parking_finder", MODE_PRIVATE)
             val history = (prefs.getStringSet("parking_history", emptySet()) ?: emptySet()).toMutableSet()
             history.add("$time  |  $spot  |  지도에서 직접 저장")
