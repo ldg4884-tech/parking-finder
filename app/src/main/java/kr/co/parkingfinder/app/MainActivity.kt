@@ -56,10 +56,9 @@ private fun ParkingFinderApp() {
     var hasLocation by remember { mutableStateOf(savedAt.isNotBlank()) }
     var status by remember { mutableStateOf(prefs.getString("monitor_status", "주차 감지 준비") ?: "") }
     var selectedDeviceName by remember { mutableStateOf(prefs.getString("car_bt_name", "") ?: "") }
-    var bleBeaconText by remember { mutableStateOf(prefs.getString("latest_ble_beacon", "실내 비콘 신호 대기 중") ?: "실내 비콘 신호 대기 중") }
     var manualZoneLabel by remember { mutableStateOf(prefs.getString("last_detected_zone", "") ?: "") }
     var ocrBusy by remember { mutableStateOf(false) }
-    var detectedSpotText by remember { mutableStateOf(prefs.getString("last_detected_spot", "아직 비콘으로 확인된 주차 구역이 없습니다") ?: "") }
+    var detectedSpotText by remember { mutableStateOf(prefs.getString("last_detected_spot", "아직 저장된 주차 구역이 없습니다") ?: "") }
     val activity = context as? ComponentActivity
     DisposableEffect(activity) {
         val observer = LifecycleEventObserver { _, event ->
@@ -69,7 +68,6 @@ private fun ParkingFinderApp() {
                 hasLocation = savedAt.isNotBlank()
                 status = prefs.getString("monitor_status", "주차 감지 준비") ?: "주차 감지 준비"
                 selectedDeviceName = prefs.getString("car_bt_name", "") ?: ""
-                bleBeaconText = prefs.getString("latest_ble_beacon", "비콘 없이 수동 위치 저장 가능") ?: "비콘 없이 수동 위치 저장 가능"
                 detectedSpotText = prefs.getString("last_detected_spot", "아직 저장된 주차 구역이 없습니다") ?: ""
                 manualZoneLabel = prefs.getString("last_detected_zone", "") ?: ""
             }
@@ -240,7 +238,7 @@ private fun ParkingFinderApp() {
                             color = Color(0xFF9BAABD), style = MaterialTheme.typography.bodyMedium
                         )
                         Spacer(Modifier.height(8.dp))
-                        Text("비콘이나 주차장 도면이 없어도 층과 기둥 번호를 직접 저장할 수 있습니다.",
+                        Text("공식 주차장 도면이 없어도 층과 기둥 번호를 직접 저장할 수 있습니다.",
                             color = Color(0xFF9BAABD), style = MaterialTheme.typography.bodySmall)
                         OutlinedTextField(
                             value = manualZoneLabel,
@@ -313,11 +311,11 @@ private fun ParkingFinderApp() {
                                 ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
                                 locationPermission.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION))
                             } else if (Build.VERSION.SDK_INT >= 31 &&
-                                (ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED)) {
+                                ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
                                 bluetoothPermission.launch(arrayOf(Manifest.permission.BLUETOOTH_CONNECT))
                             } else {
                                 ContextCompat.startForegroundService(context, Intent(context, CarBluetoothMonitorService::class.java))
-                                status = "차량 블루투스 연결 감지 중"
+                                status = "차량 블루투스 연결 해제 및 GPS 자동 기록 중"
                                 prefs.edit().putString("monitor_status", status).apply()
                             }
                         }, modifier = Modifier.fillMaxWidth()) {
