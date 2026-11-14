@@ -238,7 +238,7 @@ private fun ParkingFinderApp() {
                             color = Color(0xFF9BAABD), style = MaterialTheme.typography.bodyMedium
                         )
                         Spacer(Modifier.height(8.dp))
-                        Text("비콘이나 주차장 도면이 없어도 층과 기둥 번호를 직접 저장할 수 있습니다.",
+                        Text("공식 주차장 도면이 없어도 층과 기둥 번호를 직접 저장할 수 있습니다.",
                             color = Color(0xFF9BAABD), style = MaterialTheme.typography.bodySmall)
                         OutlinedTextField(
                             value = manualZoneLabel,
