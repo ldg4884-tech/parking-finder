@@ -6,10 +6,6 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
 import android.bluetooth.BluetoothDevice
-import android.bluetooth.BluetoothAdapter
-import android.bluetooth.le.ScanCallback
-import android.bluetooth.le.ScanResult
-import android.bluetooth.le.ScanSettings
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -31,38 +27,6 @@ class CarBluetoothMonitorService : Service() {
     private val channelId = "parking_monitor"
     private var receiverRegistered = false
     private var locationUpdatesStarted = false
-    private var bleScanStarted = false
-
-    private val bleScanCallback = object : ScanCallback() {
-        override fun onScanResult(callbackType: Int, result: ScanResult) {
-            val device = result.device
-            val address = try { device.address } catch (_: SecurityException) { return }
-            val name = try { device.name ?: result.scanRecord?.deviceName ?: "이름 없는 비콘" } catch (_: SecurityException) { "BLE 비콘" }
-            val prefs = getSharedPreferences("parking_finder", MODE_PRIVATE)
-            if (prefs.getString("beacon_map_$address", null) != null) {
-                val mappedRssi = prefs.getInt("latest_mapped_ble_rssi", Int.MIN_VALUE)
-                if (result.rssi > mappedRssi || System.currentTimeMillis() - prefs.getLong("latest_mapped_ble_time", 0L) > 15_000L) {
-                    prefs.edit().putString("latest_mapped_ble_address", address)
-                        .putInt("latest_mapped_ble_rssi", result.rssi)
-                        .putLong("latest_mapped_ble_time", System.currentTimeMillis()).apply()
-                }
-            }
-            val previousRssi = prefs.getInt("latest_ble_rssi", Int.MIN_VALUE)
-            val previousTime = prefs.getLong("latest_ble_time", 0L)
-            val isBetter = result.rssi > previousRssi || System.currentTimeMillis() - previousTime > 15_000L
-            if (isBetter) {
-                prefs.edit().putString("latest_ble_address", address)
-                    .putString("latest_ble_name", name).putInt("latest_ble_rssi", result.rssi)
-                    .putLong("latest_ble_time", System.currentTimeMillis())
-                    .putString("latest_ble_beacon", "실내 비콘: $name · 신호 ${result.rssi} dBm").apply()
-            }
-        }
-        override fun onScanFailed(errorCode: Int) {
-            getSharedPreferences("parking_finder", MODE_PRIVATE).edit()
-                .putString("latest_ble_beacon", "실내 비콘 검색 실패 (코드 $errorCode)").apply()
-        }
-    }
-
     private val locationListener = object : LocationListener {
         override fun onLocationChanged(location: Location) {
             val prefs = getSharedPreferences("parking_finder", MODE_PRIVATE)
@@ -105,7 +69,6 @@ class CarBluetoothMonitorService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         startForeground(1001, buildNotification("차량 블루투스 연결 감지 중 · 위치 수집 준비"))
         startLocationUpdates()
-        startBleScanning()
         return START_STICKY
     }
 
@@ -137,28 +100,6 @@ class CarBluetoothMonitorService : Service() {
         if (started) updateNotification("차량 연결 감지 중 · 최근 위치를 주기적으로 수집")
     }
 
-    private fun startBleScanning() {
-        if (bleScanStarted) return
-        if (Build.VERSION.SDK_INT >= 31 && checkSelfPermission(Manifest.permission.BLUETOOTH_SCAN) != PackageManager.PERMISSION_GRANTED) {
-            getSharedPreferences("parking_finder", MODE_PRIVATE).edit()
-                .putString("latest_ble_beacon", "실내 비콘 검색 권한이 필요합니다").apply()
-            return
-        }
-        try {
-            val scanner = BluetoothAdapter.getDefaultAdapter()?.bluetoothLeScanner ?: return
-            val settings = ScanSettings.Builder().setScanMode(ScanSettings.SCAN_MODE_LOW_POWER).build()
-            scanner.startScan(null, settings, bleScanCallback)
-            bleScanStarted = true
-            updateNotification("차량 연결 감지 중 · GPS 및 실내 BLE 비콘 검색")
-        } catch (_: SecurityException) {
-            getSharedPreferences("parking_finder", MODE_PRIVATE).edit()
-                .putString("latest_ble_beacon", "블루투스 검색 권한을 확인해 주세요").apply()
-        } catch (_: Exception) {
-            getSharedPreferences("parking_finder", MODE_PRIVATE).edit()
-                .putString("latest_ble_beacon", "이 기기에서 BLE 검색을 시작할 수 없습니다").apply()
-        }
-    }
-
     private fun registerBluetoothReceiver() {
         if (receiverRegistered) return
         val filter = IntentFilter(BluetoothDevice.ACTION_ACL_DISCONNECTED)
@@ -173,18 +114,6 @@ class CarBluetoothMonitorService : Service() {
 
     private fun saveParkingLocation() {
         val prefs = getSharedPreferences("parking_finder", MODE_PRIVATE)
-        val mappedAddressTime = prefs.getLong("latest_mapped_ble_time", 0L)
-        val mappedAddress = prefs.getString("latest_mapped_ble_address", null)
-            ?.takeIf { System.currentTimeMillis() - mappedAddressTime <= 90_000L }
-        val beaconAddress = mappedAddress ?: prefs.getString("latest_ble_address", null)
-        val mapping = beaconAddress?.let { prefs.getString("beacon_map_$it", null) }
-        val parts = mapping?.split("|")
-        val mapped = parts != null && parts.size >= 4
-        val floor = if (mapped) parts!![0] else ""
-        val zone = if (mapped) parts!![1] else ""
-        val markerX = if (mapped) parts!![2].toFloatOrNull() ?: -1f else -1f
-        val markerY = if (mapped) parts!![3].toFloatOrNull() ?: -1f else -1f
-
         val fine = checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
         val coarse = checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
         val manager = getSystemService(LocationManager::class.java)
@@ -209,8 +138,6 @@ class CarBluetoothMonitorService : Service() {
                 accuracy = prefs.getFloat("latest_location_accuracy", 0f)
             })
         }
-
-        // The parking event time is the Bluetooth disconnect time, not the age of the cached GPS fix.
         val now = System.currentTimeMillis()
         val time = SimpleDateFormat("yyyy.MM.dd HH:mm", Locale.KOREA).format(Date(now))
         val location = candidates.maxByOrNull { it.time }
@@ -224,39 +151,22 @@ class CarBluetoothMonitorService : Service() {
         } else {
             "GPS 위치 정보 없음"
         }
-
-        val spotText = if (mapped) "$floor $zone" else ""
-        val savedText = if (mapped) "$spotText · BLE 비콘 확인 · $gpsText" else gpsText
-        val status = when {
-            mapped -> "자동 주차 기록 완료 · $spotText 위치 확인"
-            locationUsable -> "주차 시점 자동 기록 완료 · 기둥 번호 확인 필요"
-            else -> "주차 시점 자동 기록 완료 · GPS 위치 없음, 기둥 번호 확인 필요"
-        }
-
+        val status = if (locationUsable) "주차 시점 자동 기록 완료 · 기둥 번호 확인 필요"
+            else "주차 시점 자동 기록 완료 · GPS 위치 없음, 기둥 번호 확인 필요"
         val history = (prefs.getStringSet("parking_history", emptySet()) ?: emptySet()).toMutableSet()
-        history.add("$time  |  ${if (mapped) "$spotText · " else ""}$gpsText  |  차량 블루투스 해제 자동 기록")
-
-        val editor = prefs.edit()
+        history.add("$time  |  $gpsText  |  차량 블루투스 해제 자동 기록")
+        prefs.edit()
             .putString("last_auto_parking_time", time)
             .putString("last_time", time)
-            .putString("last_location", if (mapped) "$spotText · $gpsText" else "주차 시점 자동 기록됨 · $gpsText · 기둥 번호 확인 필요")
+            .putString("last_location", "주차 시점 자동 기록됨 · $gpsText · 기둥 번호 확인 필요")
             .putString("monitor_status", status)
-            .putString("last_detected_spot", if (mapped) "$spotText · BLE 비콘 확인" else "기둥 번호 미확인 · 사진 촬영 또는 직접 입력 가능")
+            .putString("last_detected_spot", "기둥 번호 미확인 · 사진 촬영 또는 직접 입력 가능")
+            .remove("last_detected_floor")
+            .remove("last_detected_zone")
+            .remove("last_detected_marker_x")
+            .remove("last_detected_marker_y")
             .putStringSet("parking_history", history)
-
-        if (mapped) {
-            editor.putString("last_detected_floor", floor)
-                .putString("last_detected_zone", zone)
-                .putFloat("last_detected_marker_x", markerX)
-                .putFloat("last_detected_marker_y", markerY)
-                .putString("selected_floor", floor)
-        } else {
-            editor.remove("last_detected_floor")
-                .remove("last_detected_zone")
-                .remove("last_detected_marker_x")
-                .remove("last_detected_marker_y")
-        }
-        editor.apply()
+            .apply()
         updateNotification(status)
     }
 
@@ -292,11 +202,6 @@ class CarBluetoothMonitorService : Service() {
         if (receiverRegistered) {
             try { unregisterReceiver(bluetoothReceiver) } catch (_: IllegalArgumentException) { }
             receiverRegistered = false
-        }
-        if (bleScanStarted) {
-            try { BluetoothAdapter.getDefaultAdapter()?.bluetoothLeScanner?.stopScan(bleScanCallback) }
-            catch (_: SecurityException) { }
-            bleScanStarted = false
         }
         super.onDestroy()
     }
