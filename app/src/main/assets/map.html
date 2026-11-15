@@ -55,7 +55,7 @@ function build(){const d=D[cur];S=d.s;C=d.c;W=d.w;H=d.h;u=W/989;m.setAttribute('
  S.forEach(s=>{h+='<rect class="s" x="'+(s[0]-s[2]/2+.5)+'" y="'+(s[1]-s[3]/2+.5)+'" width="'+(s[2]-1)+'" height="'+(s[3]-1)+'" rx="2"/>'});
  d.f.forEach(f=>{const w=(f[0].length*25+34)*u;h+='<rect class="pl" x="'+(f[1]-w/2)+'" y="'+(f[2]-22*u)+'" width="'+w+'" height="'+44*u+'" rx="'+22*u+'"/><text class="pt" style="font-size:'+24*u+'px" x="'+f[1]+'" y="'+f[2]+'">'+f[0]+'</text>'});
  for(const k in C){h+='<circle class="co" cx="'+C[k][0]+'" cy="'+C[k][1]+'" r="'+34*u+'"/><text class="cn" style="font-size:'+30*u+'px" x="'+C[k][0]+'" y="'+C[k][1]+'">'+k+'</text>';const dn=dongFor(cur,k);if(dn)h+='<text class="cdong" style="font-size:'+17*u+'px" x="'+C[k][0]+'" y="'+(C[k][1]+52*u)+'">'+dn+'</text>'}
- m.innerHTML=h+'<g id="pm"></g><g id="mk"></g>';renderPillarMarks();zoom(1);mp.scrollTo(0,0);sel=-1;mark();panel();
+ m.innerHTML=h+'<g id="pm"></g><g id="mk"></g>';renderPillarMarks();zoom(1);requestAnimationFrame(()=>{const fit=Math.min(mp.clientWidth/W,mp.clientHeight/H);if(fit>0){m.style.width=(W*fit)+'px';m.style.height=(H*fit)+'px'}mp.scrollTo(0,0)});sel=-1;mark();panel();
  $('tb').innerHTML=['a','c'].map(k=>'<button data-k="'+k+'" class="'+((k==='a'&&cur!=='c'||k==='c'&&cur==='c')?'on':'')+'">'+(k==='a'?'B1':'B2')+'</button>').join('');
  $('subtb').innerHTML=cur==='c'?'':'<button data-k="a" class="'+(cur==='a'?'on':'')+'">B1 지도 자료 ①</button><button data-k="b" class="'+(cur==='b'?'on':'')+'">B1 지도 자료 ②</button>';
  document.querySelectorAll('#tb button,#subtb button').forEach(b=>b.onclick=()=>{pillarMode='';cur=b.dataset.k;build()})}
@@ -83,6 +83,8 @@ m.addEventListener('click',e=>{if(e.target.closest&&e.target.closest('.pillarPin
  let b=-1,bd=1e9;S.forEach((s,i)=>{const d=Math.hypot(s[0]-q.x,s[1]-q.y);if(d<bd){bd=d;b=i}});
  sel=bd<16*u?b:-1;mark();panel()});
 $('zi').onclick=()=>zoom(z+1);$('zo').onclick=()=>zoom(z-1);$('z1').onclick=()=>{zoom(1);mp.scrollTo(0,0)};
+const mapResizeObserver=new ResizeObserver(()=>{if(z===1&&W&&H){const fit=Math.min(mp.clientWidth/W,mp.clientHeight/H);if(fit>0){m.style.width=(W*fit)+'px';m.style.height=(H*fit)+'px'}}});mapResizeObserver.observe(mp);
+window.addEventListener('resize',()=>{if(z===1)requestAnimationFrame(()=>zoom(1))});
 document.addEventListener('click',e=>{if(e.target.closest&&e.target.closest('#tb,#subtb'))manual=Date.now()},true);
 function poll(){if(!window.Android)return;try{const s=JSON.parse(Android.state());
  $('st').textContent=s.mode==='underground'?('지하 추정 · '+(s.floor?(s.floor==='c'?'B2':'B1'):'층 확인 중')+' · 높이변화 '+s.rel+'m'):'지상(GPS) · 기압 '+s.hpa+'hPa';
