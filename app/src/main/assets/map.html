@@ -58,7 +58,7 @@ function build(){const d=D[cur];S=d.s;C=d.c;W=d.w;H=d.h;u=W/989;if(targetCore&&!
  m.innerHTML=h+'<g id="pm"></g><g id="mk"></g>';renderPillarMarks();zoom(1);requestAnimationFrame(()=>{const fit=mp.clientWidth/W;if(fit>0){m.style.width=(W*fit)+'px';m.style.height=(H*fit)+'px'}mp.scrollTo(0,0)});sel=-1;mark();panel();
  $('tb').innerHTML=['a','c'].map(k=>'<button data-k="'+k+'" class="'+((k==='a'&&cur!=='c'||k==='c'&&cur==='c')?'on':'')+'">'+(k==='a'?'B1':'B2')+'</button>').join('');
  $('subtb').innerHTML=cur==='c'?'':'<button data-k="a" class="'+(cur==='a'?'on':'')+'">B1 지도 자료 ①</button><button data-k="b" class="'+(cur==='b'?'on':'')+'">B1 지도 자료 ②</button>';
- document.querySelectorAll('#tb button,#subtb button').forEach(b=>b.onclick=()=>{pillarMode='';cur=b.dataset.k;build()})}
+ document.querySelectorAll('#tb button,#subtb button').forEach(b=>b.onclick=()=>{pillarMode='';targetCore=null;cur=b.dataset.k;build()})}
 const core=i=>{let b=0,bd=1e9;for(const k in C){const d=Math.hypot(C[k][0]-S[i][0],C[k][1]-S[i][1]);if(d<bd){bd=d;b=k}}return b};
 const when=t=>new Date(t).toLocaleString('ko-KR',{month:'numeric',day:'numeric',hour:'numeric',minute:'2-digit'});
 function mark(){let o='';const one=(i,c,car)=>{const s=S[i];o+='<rect x="'+(s[0]-s[2]/2-2)+'" y="'+(s[1]-s[3]/2-2)+'" width="'+(s[2]+4)+'" height="'+(s[3]+4)+'" rx="3" fill="'+c+'"/><circle class="ring" cx="'+s[0]+'" cy="'+s[1]+'" r="'+18*u+'" stroke="'+c+'"/>';if(car)o+='<text class="car" style="font-size:'+34*u+'px" x="'+s[0]+'" y="'+(s[1]-30*u)+'">🚗</text>'};
