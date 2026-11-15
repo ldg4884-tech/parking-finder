@@ -16,7 +16,6 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.webkit.JavascriptInterface
-import java.io.File
 import android.webkit.WebView
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -129,21 +128,18 @@ class MapActivity : ComponentActivity(), SensorEventListener, LocationListener {
                 .put("core", core)
                 .put("mapX", mapX)
                 .put("mapY", mapY)
-                .put("pillarCode", prefs.getString("pending_training_pillar", "") ?: "")
-                .put("ocrText", prefs.getString("pending_training_ocr", "") ?: "")
-                .put("photoPath", prefs.getString("pending_training_photo", "") ?: "")
                 .put("latitude", prefs.getString("latest_latitude", "") ?: "")
                 .put("longitude", prefs.getString("latest_longitude", "") ?: "")
                 .put("estimatedFloor", prefs.getString("estimated_floor", "") ?: "")
+                .put("estimatedFloorUpdatedAt", prefs.getLong("estimated_floor_updated_at", 0L))
+                .put("locationTime", prefs.getLong("latest_location_time", 0L))
+                .put("locationAccuracy", prefs.getFloat("latest_location_accuracy", -1f).toDouble())
                 .put("wifiFingerprint", wifiFingerprint)
+                .put("wifiCount", wifiFingerprint.length())
                 .put("sensorState", est.json())
                 .put("source", "user_confirmed_map")
             records.put(learningRecord)
-            while (records.length() > 200) {
-                val expiredPhoto = records.optJSONObject(0)?.optString("photoPath", "") ?: ""
-                if (expiredPhoto.isNotBlank()) runCatching { File(expiredPhoto).delete() }
-                records.remove(0)
-            }
+            while (records.length() > 200) records.remove(0)
             prefs.edit()
                 .putString("map_saved_floor_key", floorKey)
                 .putInt("map_saved_slot_index", slotIndex)
@@ -155,10 +151,6 @@ class MapActivity : ComponentActivity(), SensorEventListener, LocationListener {
                 .putString("monitor_status", "$spot 위치 저장 완료 · 학습 기록 " + records.length() + "건")
                 .putString("parking_learning_records", records.toString())
                 .putInt("parking_learning_record_count", records.length())
-                .remove("pending_training_photo")
-                .remove("pending_training_ocr")
-                .remove("pending_training_pillar")
-                .remove("pending_training_photo_time")
                 .putStringSet("parking_history", history)
                 .apply()
         }
