@@ -22,6 +22,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import org.json.JSONArray
 import org.json.JSONObject
 
 /** 도면 지도 화면: 층별 주차 칸 지도 + 기압/GPS 기반 지하 층 추정. 기존 MainActivity(블루투스 감지, 기록)는 그대로 둔다. */
@@ -88,7 +89,7 @@ class MapActivity : ComponentActivity(), SensorEventListener, LocationListener {
         @JavascriptInterface fun state(): String = est.json()
         @JavascriptInterface fun calibrate(key: String) { est.calibrate(key) }
         @JavascriptInterface fun hasBaro(): Boolean = baro != null
-        @JavascriptInterface fun saveManual(floorKey: String, slotIndex: Int, core: String, timestamp: Long) {
+        @JavascriptInterface fun saveManual(floorKey: String, slotIndex: Int, core: String, timestamp: Long, mapX: Double, mapY: Double) {
             if (floorKey !in setOf("a", "b", "c") || slotIndex < 0 || core.isBlank()) return
             val floorName = when (floorKey) {
                 "a", "b" -> "지하1층"
@@ -101,6 +102,24 @@ class MapActivity : ComponentActivity(), SensorEventListener, LocationListener {
             val prefs = getSharedPreferences("parking_finder", MODE_PRIVATE)
             val history = (prefs.getStringSet("parking_history", emptySet()) ?: emptySet()).toMutableSet()
             history.add("$time  |  $spot  |  지도에서 직접 저장")
+            val records = JSONArray(prefs.getString("parking_learning_records", "[]") ?: "[]")
+            val learningRecord = JSONObject()
+                .put("timestamp", timestamp)
+                .put("floorKey", floorKey)
+                .put("mapKey", floorKey)
+                .put("slotIndex", slotIndex)
+                .put("core", core)
+                .put("mapX", mapX)
+                .put("mapY", mapY)
+                .put("pillarCode", prefs.getString("pending_training_pillar", "") ?: "")
+                .put("ocrText", prefs.getString("pending_training_ocr", "") ?: "")
+                .put("photoPath", prefs.getString("pending_training_photo", "") ?: "")
+                .put("latitude", prefs.getString("latest_latitude", "") ?: "")
+                .put("longitude", prefs.getString("latest_longitude", "") ?: "")
+                .put("estimatedFloor", prefs.getString("estimated_floor", "") ?: "")
+                .put("source", "user_confirmed_map")
+            records.put(learningRecord)
+            while (records.length() > 200) records.remove(0)
             prefs.edit()
                 .putString("map_saved_floor_key", floorKey)
                 .putInt("map_saved_slot_index", slotIndex)
@@ -109,7 +128,13 @@ class MapActivity : ComponentActivity(), SensorEventListener, LocationListener {
                 .putString("last_location", spot)
                 .putString("last_time", time)
                 .putString("last_detected_spot", "마지막 지도 저장 위치: $spot")
-                .putString("monitor_status", "$spot 위치 저장 완료")
+                .putString("monitor_status", "$spot 위치 저장 완료 · 학습 기록 " + records.length() + "건")
+                .putString("parking_learning_records", records.toString())
+                .putInt("parking_learning_record_count", records.length())
+                .remove("pending_training_photo")
+                .remove("pending_training_ocr")
+                .remove("pending_training_pillar")
+                .remove("pending_training_photo_time")
                 .putStringSet("parking_history", history)
                 .apply()
         }
