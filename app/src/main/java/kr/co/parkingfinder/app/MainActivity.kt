@@ -167,49 +167,15 @@ private fun ParkingFinderApp() {
                                 }, label = { Text(floor) })
                             }
                         }
-                        SectionedParkingMap(
-                            selectedBay = selectedParkingBay,
-                            lastSavedBay = if ((prefs.getString("manual_saved_floor", "") ?: "") == selectedFloor)
-                                prefs.getString("manual_saved_bay", "") ?: "" else "",
-                            facilityByZone = listOf("A", "B", "C", "D").associateWith {
-                                prefs.getString("facility_${selectedFloor}_$it", "없음") ?: "없음"
-                            },
-                            pillarsByZone = listOf("A", "B", "C", "D").associateWith {
-                                prefs.getString("pillars_${selectedFloor}_$it", "") ?: ""
-                            },
-                            facilityPositionByZone = listOf("A", "B", "C", "D").associateWith {
-                                prefs.getString("facility_position_${selectedFloor}_$it", "중앙 상단") ?: "중앙 상단"
-                            },
-                            zoneNameByZone = listOf("A", "B", "C", "D").associateWith {
-                                prefs.getString("zone_name_${selectedFloor}_$it", "$it 구역") ?: "$it 구역"
-                            },
-                            bayCountByZone = listOf("A", "B", "C", "D").associateWith {
-                                prefs.getInt("bay_count_${selectedFloor}_$it", 6)
-                            },
-                            onSelect = { bay ->
-                                selectedParkingBay = bay
-                                prefs.edit().putString("selected_bay_$selectedFloor", bay).apply()
-                                status = "$selectedFloor $bay 위치 선택됨"
-                            },
-                            onFacilityChange = { zone, facility ->
-                                prefs.edit().putString("facility_${selectedFloor}_$zone", facility).apply()
-                                status = "$zone 구역 시설 위치 저장"
-                            },
-                            onPillarChange = { zone, pillar ->
-                                prefs.edit().putString("pillars_${selectedFloor}_$zone", pillar).apply()
-                            },
-                            onFacilityPositionChange = { zone, position ->
-                                prefs.edit().putString("facility_position_${selectedFloor}_$zone", position).apply()
-                                status = "$zone 구역 시설 위치를 $position(으)로 저장"
-                            },
-                            onZoneNameChange = { zone, name ->
-                                prefs.edit().putString("zone_name_${selectedFloor}_$zone", name).apply()
-                            },
-                            onBayCountChange = { zone, count ->
-                                prefs.edit().putInt("bay_count_${selectedFloor}_$zone", count).apply()
-                            },
-                            modifier = Modifier.fillMaxWidth()
+                        Text(
+                            "구역을 나눈 임시 배치도 대신 실제 주차장 지도에서 위치를 선택하도록 변경했습니다.",
+                            color = Color(0xFF9BAABD),
+                            style = MaterialTheme.typography.bodySmall
                         )
+                        Button(
+                            onClick = { context.startActivity(Intent(context, MapActivity::class.java)) },
+                            modifier = Modifier.fillMaxWidth()
+                        ) { Text("주차장 지도 열기") }
                         Text(
                             if (selectedParkingBay.isBlank()) "통로 양쪽의 주차면을 선택하세요."
                             else "선택 위치: $selectedFloor · $selectedParkingBay",
