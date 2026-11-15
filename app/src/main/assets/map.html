@@ -7,7 +7,7 @@ body{background:var(--bg);color:var(--tx);font:15px/1.45 system-ui,"Noto Sans KR
 header{padding:10px 14px;background:var(--cd);border-bottom:1px solid var(--ln)}h1{font-size:17px;margin:0}.sub{color:var(--mu);font-size:12px;margin-top:2px}
 nav{display:flex;gap:6px;margin:8px 0 4px}nav#subtb{margin:0 0 4px}nav#subtb button{padding:6px 4px;font-size:12px}nav button{flex:1;padding:8px 4px;border-radius:10px;border:1px solid var(--ln);background:var(--bg);color:var(--mu);font-size:13px;font-weight:600}nav button.on{background:var(--ac);border-color:var(--ac);color:#fff}
 .wrap{position:relative;flex:1;min-height:0}.map{position:absolute;inset:0;overflow:auto;background:var(--bg)}
-#m{display:block;width:100%;height:auto}
+#m{display:block;width:100%;height:auto;max-width:none;margin:0 auto;flex:none}
 .zb{position:absolute;right:10px;top:10px;display:flex;flex-direction:column;gap:6px;z-index:2}
 .zb button{width:40px;height:40px;border-radius:12px;border:1px solid var(--ln);background:var(--cd);color:var(--tx);font-size:18px}
 .panel{background:var(--cd);border-top:1px solid var(--ln);padding:12px 14px}.panel p{margin:0 0 8px}.mu{color:var(--mu);font-size:12px}
@@ -65,7 +65,7 @@ function mark(){let o='';const one=(i,c,car)=>{const s=S[i];o+='<rect x="'+(s[0]
  const here=sv&&sv.k===cur;if(prediction&&prediction.k===cur)one(prediction.i,'var(--ac)',0);if(here)one(sv.i,'var(--rd)',1);if(sel>=0&&!(here&&sv.i===sel))one(sel,'var(--wa)',0);
  $('mk').innerHTML=o}
 function go(x,y){const k=m.clientWidth/W;mp.scrollTo({left:x*k-mp.clientWidth/2,top:y*k-mp.clientHeight/2,behavior:'smooth'})}
-function zoom(v,x,y){z=Math.max(1,Math.min(5,v));m.style.width=z*100+'%';if(x!=null)requestAnimationFrame(()=>go(x,y))}
+function zoom(v,x,y){z=Math.max(1,Math.min(5,v));const fit=Math.min(mp.clientWidth/W,mp.clientHeight/H);const base=(Number.isFinite(fit)&&fit>0)?fit:mp.clientWidth/W;m.style.width=(W*base*z)+'px';m.style.height=(H*base*z)+'px';if(x!=null)requestAnimationFrame(()=>go(x,y))}
 function learningStatsHtml(){if(!window.Android||!Android.learningStats)return'<p>기록 현황을 불러올 수 없습니다.</p>';try{const s=JSON.parse(Android.learningStats());const m=s.maps;const n=['a','b','c'].reduce((v,k)=>v+m[k].withWifi,0);return'<p>전체 '+s.total+'건 · Wi-Fi 신호 3개 이상 저장 '+n+'건</p><small>B1 지도 ① '+m.a.total+'건('+m.a.withWifi+'건 신호 포함) · B1 지도 ② '+m.b.total+'건('+m.b.withWifi+'건 신호 포함) · B2 '+m.c.total+'건('+m.c.withWifi+'건 신호 포함)</small>'}catch(e){return'<p>기록 현황을 불러오지 못했습니다.</p>'}}
 function panel(){let p='';
  if(sel>=0){const ck=core(sel),dn=dongFor(cur,ck);p+='<p><b>선택한 칸: '+L[cur]+(cur==='c'?'':' · 지도 자료 '+(cur==='a'?'①':'②'))+' · 지도 기준점 '+ck+' 근처</b><br><span class="mu">연결된 동: '+(dn||'아직 지정되지 않음')+'</span></p><div class="row"><button class="pri" id="sv">이 위치를 학습 데이터로 저장</button></div><p style="margin-top:10px"><label for="dongPick">이 코어의 승강기에서 연결되는 동</label></p><div class="row"><select id="dongPick" style="flex:1;padding:11px;border-radius:10px;border:1px solid var(--ln);background:var(--bg);color:var(--tx)"><option value="">동 연결 안 함</option>'+dongOptions.map(d=>'<option value="'+d+'" '+(dn===d?'selected':'')+'>'+d+'</option>').join('')+'</select><button id="dongSave">동 연결 저장</button></div>';}
