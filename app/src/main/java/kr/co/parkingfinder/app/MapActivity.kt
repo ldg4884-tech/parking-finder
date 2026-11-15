@@ -91,13 +91,13 @@ class MapActivity : ComponentActivity(), SensorEventListener, LocationListener {
         @JavascriptInterface fun saveManual(floorKey: String, slotIndex: Int, core: String, timestamp: Long) {
             if (floorKey !in setOf("a", "b", "c") || slotIndex < 0 || core.isBlank()) return
             val floorName = when (floorKey) {
-                "a" -> "지하1층-1"
-                "b" -> "지하1층-2"
+                "a", "b" -> "지하1층"
                 else -> "지하2층"
             }
             val time = java.text.SimpleDateFormat("yyyy.MM.dd HH:mm", java.util.Locale.KOREA)
                 .format(java.util.Date(timestamp))
-            val spot = "$floorName · 지도 기준점 $core 인근 · 지도상 ${slotIndex + 1}번 주차면"
+            val mapPart = if (floorKey == "a") "지도 자료 ①" else if (floorKey == "b") "지도 자료 ②" else ""
+            val spot = listOf(floorName, mapPart, "지도 기준점 $core 인근", "지도상 ${slotIndex + 1}번 주차면").filter { it.isNotBlank() }.joinToString(" · ")
             val prefs = getSharedPreferences("parking_finder", MODE_PRIVATE)
             val history = (prefs.getStringSet("parking_history", emptySet()) ?: emptySet()).toMutableSet()
             history.add("$time  |  $spot  |  지도에서 직접 저장")
