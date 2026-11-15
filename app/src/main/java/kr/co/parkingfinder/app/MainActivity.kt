@@ -312,7 +312,7 @@ private fun ParkingFinderApp() {
                         }
                     }
                 }
-                Text("주차 후 기둥 표지판을 촬영하고 지도에서 실제 주차 칸을 확정하면 사진·OCR·지도 좌표가 학습 데이터로 쌓입니다.",
+                Text("주차 후 기둥 표지판을 촬영하고 지도에서 실제 주차 칸을 확정하면 사진·OCR·지도 좌표·주변 Wi-Fi 신호·센서 정보가 학습 데이터로 쌓입니다.",
                     color = Color(0xFF8291A5), style = MaterialTheme.typography.labelSmall)
                 OutlinedButton(onClick = {
                     historyItems = (prefs.getStringSet("parking_history", emptySet()) ?: emptySet()).toList().sortedDescending()
