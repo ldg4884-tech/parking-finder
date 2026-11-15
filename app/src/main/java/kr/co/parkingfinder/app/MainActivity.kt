@@ -32,6 +32,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import java.io.File
+import java.io.FileOutputStream
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -92,20 +94,39 @@ private fun ParkingFinderApp() {
             status = "촬영이 취소되었습니다."
         } else {
             ocrBusy = true
-            status = "기둥 번호를 읽는 중입니다."
+            status = "사진을 저장하고 기둥 번호를 읽는 중입니다."
+            val photoFile = File(context.filesDir, "parking_training/" + System.currentTimeMillis() + ".jpg")
+            val photoSaved = runCatching {
+                photoFile.parentFile?.mkdirs()
+                FileOutputStream(photoFile).use { output ->
+                    bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 88, output)
+                }
+                prefs.edit().putString("pending_training_photo", photoFile.absolutePath).apply()
+                true
+            }.getOrDefault(false)
             val recognizer = TextRecognition.getClient(KoreanTextRecognizerOptions.Builder().build())
             recognizer.process(InputImage.fromBitmap(bitmap, 0))
                 .addOnSuccessListener { visionText ->
                     val lines: List<String> = visionText.textBlocks.mapNotNull { block -> block.text.trim().takeIf { value -> value.isNotEmpty() } }
-                    val candidate = lines.firstOrNull { line ->
+                    val rawText = visionText.text.trim()
+                    val compactText = rawText.replace("\\s".toRegex(), "")
+                    val pillarMatch = Regex("(?i)(\\d{1,2})([A-Z])").find(compactText)
+                    val pillarCode = pillarMatch?.let { it.groupValues[1] + it.groupValues[2].uppercase(Locale.ROOT) } ?: ""
+                    prefs.edit()
+                        .putString("pending_training_ocr", rawText)
+                        .putString("pending_training_pillar", pillarCode)
+                        .putLong("pending_training_photo_time", System.currentTimeMillis())
+                        .apply()
+                    val candidate = if (pillarCode.isNotBlank()) pillarCode else lines.firstOrNull { line ->
                         line.any { it.isDigit() } && line.length <= 30
                     } ?: lines.firstOrNull { it.isNotBlank() }
                     if (candidate.isNullOrBlank()) {
-                        status = "번호를 읽지 못했습니다. 밝게 촬영하고 다시 시도해 주세요."
+                        status = if (photoSaved) "사진은 저장했습니다. 번호를 읽지 못해 직접 입력해 주세요." else "사진 저장과 번호 인식에 실패했습니다. 다시 촬영해 주세요."
                     } else {
                         manualZoneLabel = candidate
-                        status = "인식 결과를 입력란에 넣었습니다. 확인 후 저장해 주세요."
+                        status = "인식 결과를 입력란에 넣었습니다. 지도에서 주차 칸을 확정하면 학습 데이터로 저장됩니다."
                     }
+                    recognizer.close()
                     ocrBusy = false
                 }
                 .addOnFailureListener {
@@ -288,7 +309,7 @@ private fun ParkingFinderApp() {
                         }
                     }
                 }
-                Text("통로 양쪽 주차면을 선택하고 기둥 번호를 직접 입력하거나 카메라로 인식해 저장하세요.",
+                Text("주차 후 기둥 표지판을 촬영하고 지도에서 실제 주차 칸을 확정하면 사진·OCR·지도 좌표가 학습 데이터로 쌓입니다.",
                     color = Color(0xFF8291A5), style = MaterialTheme.typography.labelSmall)
                 OutlinedButton(onClick = {
                     historyItems = (prefs.getStringSet("parking_history", emptySet()) ?: emptySet()).toList().sortedDescending()
