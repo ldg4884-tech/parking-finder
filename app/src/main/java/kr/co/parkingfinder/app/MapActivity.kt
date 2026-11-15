@@ -88,6 +88,80 @@ class MapActivity : ComponentActivity(), SensorEventListener, LocationListener {
     @Deprecated("API 29 이하 호환용") override fun onStatusChanged(p: String?, s: Int, x: Bundle?) {}
 
     inner class Bridge {
+        @JavascriptInterface fun predictParking(): String {
+            val result = JSONObject()
+            val permission = checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
+                checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+            if (!permission) return result.put("ok", false).put("reason", "location_permission").toString()
+
+            val nowElapsed = SystemClock.elapsedRealtime()
+            val current = runCatching {
+                val wifi = applicationContext.getSystemService(WIFI_SERVICE) as WifiManager
+                wifi.scanResults.asSequence()
+                    .filter { !it.BSSID.isNullOrBlank() && it.timestamp > 0L }
+                    .filter { (nowElapsed - it.timestamp / 1000L).coerceIn(0L, Long.MAX_VALUE) <= 120_000L }
+                    .associate { it.BSSID.lowercase() to it.level }
+            }.getOrElse { emptyMap() }
+            if (current.size < 3) return result.put("ok", false)
+                .put("reason", "few_signals").put("signalCount", current.size).toString()
+
+            val prefs = getSharedPreferences("parking_finder", MODE_PRIVATE)
+            val records = runCatching {
+                JSONArray(prefs.getString("parking_learning_records", "[]") ?: "[]")
+            }.getOrElse { JSONArray() }
+            if (records.length() == 0) return result.put("ok", false).put("reason", "no_records").toString()
+
+            val activeFloor = est.floorKey
+            data class Sample(val mapKey: String, val slot: Int, val score: Double, val matched: Int)
+            val scores = mutableMapOf<String, MutableList<Sample>>()
+            for (i in 0 until records.length()) {
+                val record = records.optJSONObject(i) ?: continue
+                val mapKey = record.optString("mapKey")
+                if (mapKey !in setOf("a", "b", "c")) continue
+                if (activeFloor != null && mapKey != activeFloor) continue
+                val slot = record.optInt("slotIndex", -1)
+                if (slot < 0) continue
+                val aps = record.optJSONArray("wifiFingerprint") ?: continue
+                val sample = mutableMapOf<String, Int>()
+                for (j in 0 until aps.length()) {
+                    val ap = aps.optJSONObject(j) ?: continue
+                    val bssid = ap.optString("bssid").lowercase()
+                    val ageMs = ap.optLong("ageMs", Long.MAX_VALUE)
+                    if (bssid.isNotBlank() && ageMs in 0L..120_000L) sample[bssid] = ap.optInt("rssi")
+                }
+                if (sample.size < 3) continue
+                val common = current.keys.intersect(sample.keys)
+                if (common.size < 3) continue
+                val unionCount = current.keys.union(sample.keys).size.coerceAtLeast(1)
+                val overlap = common.size.toDouble() / unionCount
+                val meanDifference = common.map { kotlin.math.abs(current.getValue(it) - sample.getValue(it)) }.average()
+                val signalSimilarity = (1.0 - meanDifference / 100.0).coerceIn(0.0, 1.0)
+                val score = (overlap * 0.60 + signalSimilarity * 0.40).coerceIn(0.0, 1.0)
+                val key = "$mapKey:$slot"
+                scores.getOrPut(key) { mutableListOf() }.add(Sample(mapKey, slot, score, common.size))
+            }
+            val best = scores.values.mapNotNull { samples ->
+                if (samples.isEmpty()) null else {
+                    val top = samples.sortedByDescending { it.score }.take(3)
+                    val first = top.first()
+                    val average = top.map { it.score }.average()
+                    Sample(first.mapKey, first.slot, average, top.minOf { it.matched }) to samples.size
+                }
+            }.maxByOrNull { it.first.score }
+            if (best == null) return result.put("ok", false).put("reason", "no_match").toString()
+            val candidate = best.first
+            val confident = candidate.score >= 0.65 && candidate.matched >= 3 && best.second >= 2
+            return result.put("ok", true)
+                .put("mapKey", candidate.mapKey)
+                .put("slotIndex", candidate.slot)
+                .put("score", candidate.score)
+                .put("matchedAps", candidate.matched)
+                .put("samples", best.second)
+                .put("confident", confident)
+                .put("signalCount", current.size)
+                .put("floorKey", activeFloor ?: JSONObject.NULL)
+                .toString()
+        }
         @JavascriptInterface fun state(): String = est.json()
         @JavascriptInterface fun calibrate(key: String) { est.calibrate(key) }
         @JavascriptInterface fun hasBaro(): Boolean = baro != null
