@@ -151,7 +151,7 @@ class CarBluetoothMonitorService : Service(), SensorEventListener {
         if (wifiReceiverRegistered) return
         val filter = IntentFilter(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION)
         if (Build.VERSION.SDK_INT >= 33) {
-            registerReceiver(wifiScanReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+            registerReceiver(wifiScanReceiver, filter, Context.RECEIVER_EXPORTED)
         } else {
             @Suppress("DEPRECATION")
             registerReceiver(wifiScanReceiver, filter)
@@ -178,6 +178,15 @@ class CarBluetoothMonitorService : Service(), SensorEventListener {
             if (!predictAndSaveParkingSpot()) {
                 updateNotification("주차 시각 자동 기록 · 새 Wi-Fi 검색 제한, 칸은 확인 필요")
             }
+        } else {
+            floorHandler.postDelayed({
+                if (pendingWifiPrediction) {
+                    pendingWifiPrediction = false
+                    if (!predictAndSaveParkingSpot()) {
+                        updateNotification("주차 시각 자동 기록 · Wi-Fi 검색 응답 없음, 칸은 확인 필요")
+                    }
+                }
+            }, 15_000L)
         }
     }
 
