@@ -64,7 +64,7 @@ m.addEventListener('click',e=>{const p=m.createSVGPoint();p.x=e.clientX;p.y=e.cl
  let b=-1,bd=1e9;S.forEach((s,i)=>{const d=Math.hypot(s[0]-q.x,s[1]-q.y);if(d<bd){bd=d;b=i}});
  sel=bd<16*u?b:-1;mark();panel()});
 $('zi').onclick=()=>zoom(z+1);$('zo').onclick=()=>zoom(z-1);$('z1').onclick=()=>{zoom(1);mp.scrollTo(0,0)};
-document.addEventListener('click',e=>{if(e.target.closest&&e.target.closest('#tb'))manual=Date.now()},true);
+document.addEventListener('click',e=>{if(e.target.closest&&e.target.closest('#tb,#subtb'))manual=Date.now()},true);
 function poll(){if(!window.Android)return;try{const s=JSON.parse(Android.state());
  $('st').textContent=s.mode==='underground'?('지하 추정 · '+(s.floor?(s.floor==='c'?'B2':'B1'):'층 확인 중')+' · 높이변화 '+s.rel+'m'):'지상(GPS) · 기압 '+s.hpa+'hPa';
  if(s.mode==='underground'&&s.floor&&Date.now()-manual>20000){
