@@ -168,7 +168,7 @@ private fun ParkingFinderApp() {
                             }
                         }
                         Text(
-                            "구역을 나눈 임시 배치도 대신 실제 주차장 지도에서 위치를 선택하도록 변경했습니다.",
+                            "임시 A~D 구역 배치도는 제거했습니다. 실제 주차 위치는 지도 화면에서 선택하세요.",
                             color = Color(0xFF9BAABD),
                             style = MaterialTheme.typography.bodySmall
                         )
@@ -177,8 +177,7 @@ private fun ParkingFinderApp() {
                             modifier = Modifier.fillMaxWidth()
                         ) { Text("주차장 지도 열기") }
                         Text(
-                            if (selectedParkingBay.isBlank()) "통로 양쪽의 주차면을 선택하세요."
-                            else "선택 위치: $selectedFloor · $selectedParkingBay",
+                            "현재 선택 층: $selectedFloor",
                             color = Color(0xFF75D5C2),
                             style = MaterialTheme.typography.bodySmall
                         )
