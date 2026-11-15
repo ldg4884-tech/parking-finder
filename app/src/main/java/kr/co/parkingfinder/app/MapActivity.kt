@@ -332,11 +332,13 @@ class MapActivity : ComponentActivity(), SensorEventListener, LocationListener {
                 .putInt("parking_learning_record_count", records.length())
                 .putStringSet("parking_history", history)
                 .apply()
+            ParkingWidgetProvider.refresh(this@MapActivity)
         }
         @JavascriptInterface fun clearManual() {
             val prefs = getSharedPreferences("parking_finder", MODE_PRIVATE)
             prefs.edit().remove("map_saved_floor_key").remove("map_saved_slot_index")
                 .remove("map_saved_core").remove("map_saved_timestamp").apply()
+            ParkingWidgetProvider.refresh(this@MapActivity)
         }
         @JavascriptInterface fun lastAuto(): String {
             val p = getSharedPreferences("parking_finder", MODE_PRIVATE)
