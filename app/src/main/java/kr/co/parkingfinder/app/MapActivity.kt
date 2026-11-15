@@ -123,6 +123,7 @@ class MapActivity : ComponentActivity(), SensorEventListener, LocationListener {
             return JSONObject()
                 .put("loc", p.getString("last_location", "") ?: "")
                 .put("time", p.getString("last_auto_parking_time", "") ?: "")
+                .put("floor", p.getString("last_detected_floor", "") ?: "")
                 .toString()
         }
         @JavascriptInterface fun openSettings() {
