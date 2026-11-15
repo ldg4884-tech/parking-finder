@@ -44,7 +44,7 @@ function build(){const d=D[cur];S=d.s;C=d.c;W=d.w;H=d.h;u=W/989;m.setAttribute('
  m.innerHTML=h+'<g id="pm"></g><g id="mk"></g>';renderPillarMarks();zoom(1);mp.scrollTo(0,0);sel=-1;mark();panel();
  $('tb').innerHTML=['a','c'].map(k=>'<button data-k="'+k+'" class="'+((k==='a'&&cur!=='c'||k==='c'&&cur==='c')?'on':'')+'">'+(k==='a'?'B1':'B2')+'</button>').join('');
  $('subtb').innerHTML=cur==='c'?'':'<button data-k="a" class="'+(cur==='a'?'on':'')+'">B1 지도 자료 ①</button><button data-k="b" class="'+(cur==='b'?'on':'')+'">B1 지도 자료 ②</button>';
- document.querySelectorAll('#tb button,#subtb button').forEach(b=>b.onclick=()=>{cur=b.dataset.k;build()})}
+ document.querySelectorAll('#tb button,#subtb button').forEach(b=>b.onclick=()=>{pillarMode='';cur=b.dataset.k;build()})}
 const core=i=>{let b=0,bd=1e9;for(const k in C){const d=Math.hypot(C[k][0]-S[i][0],C[k][1]-S[i][1]);if(d<bd){bd=d;b=k}}return b};
 const when=t=>new Date(t).toLocaleString('ko-KR',{month:'numeric',day:'numeric',hour:'numeric',minute:'2-digit'});
 function mark(){let o='';const one=(i,c,car)=>{const s=S[i];o+='<rect x="'+(s[0]-s[2]/2-2)+'" y="'+(s[1]-s[3]/2-2)+'" width="'+(s[2]+4)+'" height="'+(s[3]+4)+'" rx="3" fill="'+c+'"/><circle class="ring" cx="'+s[0]+'" cy="'+s[1]+'" r="'+18*u+'" stroke="'+c+'"/>';if(car)o+='<text class="car" style="font-size:'+34*u+'px" x="'+s[0]+'" y="'+(s[1]-30*u)+'">🚗</text>'};
@@ -62,7 +62,7 @@ function panel(){let p='';
  const a=$('sv');if(a)a.onclick=()=>{sv={k:cur,i:sel,t:Date.now()};try{localStorage.setItem('pk',JSON.stringify(sv))}catch(e){}if(window.Android&&Android.saveManual)Android.saveManual(cur,sel,core(sel),sv.t);sel=-1;mark();panel()};
  const f=$('fd');if(f)f.onclick=()=>{if(sv.k!==cur){cur=sv.k;build()}const s=D[sv.k].s[sv.i];zoom(4,s[0],s[1])};
  const c=$('ck');if(c)c.onclick=()=>{sv=null;try{localStorage.removeItem('pk')}catch(e){}if(window.Android&&Android.clearManual)Android.clearManual();mark();panel()}}
-m.addEventListener('click',e=>{const p=m.createSVGPoint();p.x=e.clientX;p.y=e.clientY;const q=p.matrixTransform(m.getScreenCTM().inverse());
+m.addEventListener('click',e=>{if(e.target.closest&&e.target.closest('.pillarPin'))return;const p=m.createSVGPoint();p.x=e.clientX;p.y=e.clientY;const q=p.matrixTransform(m.getScreenCTM().inverse());
  if(pillarMode){if(z<2.5){zoom(4,q.x,q.y);return}savePillarMark(pillarMode,[Math.round(q.x),Math.round(q.y)]);pillarMode='';renderPillarMarks();panel();return}
  if(z<2.5){zoom(4,q.x,q.y);return}
  let b=-1,bd=1e9;S.forEach((s,i)=>{const d=Math.hypot(s[0]-q.x,s[1]-q.y);if(d<bd){bd=d;b=i}});
