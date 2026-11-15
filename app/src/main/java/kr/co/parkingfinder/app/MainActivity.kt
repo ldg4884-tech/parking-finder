@@ -143,8 +143,8 @@ private fun ParkingFinderApp() {
                         Spacer(Modifier.height(10.dp))
                         Text(status, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                         Text(
-                            if (selectedDeviceName.isBlank()) "차량 블루투스를 등록하면 연결 해제 시 주차 시각과 층을 자동 기록합니다. 주차 칸은 별도 인식이 필요합니다."
-                            else "감지 차량: $selectedDeviceName",
+                            if (selectedDeviceName.isBlank()) "차량 블루투스가 끊기면 주차 시각과 층을 자동 기록하고, 학습 데이터가 충분하면 Wi-Fi로 주차 칸까지 추정합니다."
+                            else "감지 차량: $selectedDeviceName · 연결 해제 시 칸 자동 추정 시도",
                             color = Color(0xFF9BAABD), style = MaterialTheme.typography.bodyMedium
                         )
                         Spacer(Modifier.height(8.dp))
@@ -190,7 +190,7 @@ private fun ParkingFinderApp() {
                         }
                     }
                 }
-                Text("주차 후 지도에서 내 차가 있는 칸을 선택하면 해당 위치와 주변 Wi-Fi 신호·층·센서 정보가 학습 데이터로 쌓입니다.",
+                Text("정확한 자동 주차 칸 추정을 위해 처음에는 지도에서 실제 칸을 직접 저장해 학습 데이터를 모아 주세요.",
                     color = Color(0xFF8291A5), style = MaterialTheme.typography.labelSmall)
                 OutlinedButton(onClick = {
                     historyItems = (prefs.getStringSet("parking_history", emptySet()) ?: emptySet()).toList().sortedDescending()
@@ -198,7 +198,7 @@ private fun ParkingFinderApp() {
                 }, modifier = Modifier.fillMaxWidth()) {
                     Icon(Icons.Default.Map, null); Text(" 주차 기록")
                 }
-                Text("차량 블루투스 연결 해제 시 주차 시각을 자동 기록하고, GPS와 기압 센서로 지하 층을 추정합니다. 주차 칸은 별도 인식이 필요합니다.",
+                Text("차량 블루투스 연결 해제 시 Wi-Fi를 새로 검색해 저장된 학습 기록과 비교합니다. 동일 칸 3회 이상 기록·유사도 70% 이상·2순위와 12%p 이상 차이가 있을 때만 자동 추정 위치를 저장합니다. 조건을 충족하지 못하면 주차 칸은 확인 필요로 남습니다.",
                     color = Color(0xFF8291A5), style = MaterialTheme.typography.labelSmall)
             }
         }
