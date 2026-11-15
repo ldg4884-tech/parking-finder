@@ -66,6 +66,31 @@ function mark(){let o='';const one=(i,c,car)=>{const s=S[i];o+='<rect x="'+(s[0]
  $('mk').innerHTML=o}
 function go(x,y){const k=m.clientWidth/W;mp.scrollTo({left:x*k-mp.clientWidth/2,top:y*k-mp.clientHeight/2,behavior:'smooth'})}
 function zoom(v,x,y){z=Math.max(1,Math.min(5,v));const fit=mp.clientWidth/W;const base=(Number.isFinite(fit)&&fit>0)?fit:mp.clientWidth/W;m.style.width=(W*base*z)+'px';m.style.height=(H*base*z)+'px';if(x!=null)requestAnimationFrame(()=>go(x,y))}
+ // Two-finger pinch zoom for Android WebView. Keep the map point under the fingers stationary.
+ let pinchState=null;
+ function touchDistance(a,b){return Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY)}
+ function touchCenter(a,b){return {x:(a.clientX+b.clientX)/2,y:(a.clientY+b.clientY)/2}}
+ mp.addEventListener('touchstart',e=>{
+   if(e.touches.length===2){
+     const a=e.touches[0],b=e.touches[1],center=touchCenter(a,b),rect=mp.getBoundingClientRect(),base=mp.clientWidth/W;
+     if(base>0)pinchState={distance:touchDistance(a,b),z:z,base:base,pointX:(center.x-rect.left+mp.scrollLeft)/(base*z),pointY:(center.y-rect.top+mp.scrollTop)/(base*z),offsetX:center.x-rect.left,offsetY:center.y-rect.top};
+     e.preventDefault();
+   }
+ },{passive:false});
+ mp.addEventListener('touchmove',e=>{
+   if(!pinchState||e.touches.length!==2)return;
+   e.preventDefault();
+   const a=e.touches[0],b=e.touches[1],distance=touchDistance(a,b),center=touchCenter(a,b),rect=mp.getBoundingClientRect();
+   const next=Math.max(1,Math.min(5,pinchState.z*(distance/pinchState.distance)));
+   z=next;
+   const scale=pinchState.base*z;
+   m.style.width=(W*scale)+'px';m.style.height=(H*scale)+'px';
+   mp.scrollLeft=pinchState.pointX*scale-(center.x-rect.left);
+   mp.scrollTop=pinchState.pointY*scale-(center.y-rect.top);
+ },{passive:false});
+ const endPinch=()=>{pinchState=null};
+ mp.addEventListener('touchend',endPinch,{passive:true});
+ mp.addEventListener('touchcancel',endPinch,{passive:true});
 function learningStatsHtml(){if(!window.Android||!Android.learningStats)return'<p>기록 현황을 불러올 수 없습니다.</p>';try{const s=JSON.parse(Android.learningStats());const m=s.maps;const n=['a','b','c'].reduce((v,k)=>v+m[k].withWifi,0);return'<p>전체 '+s.total+'건 · Wi-Fi 신호 3개 이상 저장 '+n+'건</p><small>B1 지도 ① '+m.a.total+'건('+m.a.withWifi+'건 신호 포함) · B1 지도 ② '+m.b.total+'건('+m.b.withWifi+'건 신호 포함) · B2 '+m.c.total+'건('+m.c.withWifi+'건 신호 포함)</small>'}catch(e){return'<p>기록 현황을 불러오지 못했습니다.</p>'}}
 function panel(){let p='';
  if(sel>=0){const ck=core(sel),dn=dongFor(cur,ck);p+='<p><b>선택한 칸: '+L[cur]+(cur==='c'?'':' · 지도 자료 '+(cur==='a'?'①':'②'))+' · 지도 기준점 '+ck+' 근처</b><br><span class="mu">연결된 동: '+(dn||'아직 지정되지 않음')+'</span></p><div class="row"><button class="pri" id="sv">이 위치를 학습 데이터로 저장</button></div><p style="margin-top:10px"><label for="dongPick">이 코어의 승강기에서 연결되는 동</label></p><div class="row"><select id="dongPick" style="flex:1;padding:11px;border-radius:10px;border:1px solid var(--ln);background:var(--bg);color:var(--tx)"><option value="">동 연결 안 함</option>'+dongOptions.map(d=>'<option value="'+d+'" '+(dn===d?'selected':'')+'>'+d+'</option>').join('')+'</select><button id="dongSave">동 연결 저장</button></div>';}
