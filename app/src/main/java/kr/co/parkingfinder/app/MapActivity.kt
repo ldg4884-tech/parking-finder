@@ -11,6 +11,7 @@ import android.hardware.SensorManager
 import android.location.Location
 import android.location.LocationListener
 import android.location.LocationManager
+import android.net.wifi.WifiManager
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -103,6 +104,22 @@ class MapActivity : ComponentActivity(), SensorEventListener, LocationListener {
             val history = (prefs.getStringSet("parking_history", emptySet()) ?: emptySet()).toMutableSet()
             history.add("$time  |  $spot  |  지도에서 직접 저장")
             val records = JSONArray(prefs.getString("parking_learning_records", "[]") ?: "[]")
+            val wifiFingerprint = JSONArray()
+            val hasLocationPermission =
+                checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
+                checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+            if (hasLocationPermission) {
+                runCatching {
+                    val wifi = applicationContext.getSystemService(WIFI_SERVICE) as WifiManager
+                    wifi.scanResults.take(40).forEach { result ->
+                        wifiFingerprint.put(JSONObject()
+                            .put("bssid", result.BSSID ?: "")
+                            .put("rssi", result.level)
+                            .put("frequency", result.frequency)
+                            .put("ageMs", (System.currentTimeMillis() - result.timestamp / 1000L).coerceAtLeast(0L)))
+                    }
+                }
+            }
             val learningRecord = JSONObject()
                 .put("timestamp", timestamp)
                 .put("floorKey", floorKey)
@@ -117,6 +134,8 @@ class MapActivity : ComponentActivity(), SensorEventListener, LocationListener {
                 .put("latitude", prefs.getString("latest_latitude", "") ?: "")
                 .put("longitude", prefs.getString("latest_longitude", "") ?: "")
                 .put("estimatedFloor", prefs.getString("estimated_floor", "") ?: "")
+                .put("wifiFingerprint", wifiFingerprint)
+                .put("sensorState", est.json())
                 .put("source", "user_confirmed_map")
             records.put(learningRecord)
             while (records.length() > 200) records.remove(0)
