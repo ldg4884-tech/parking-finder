@@ -198,7 +198,7 @@ private fun ParkingFinderApp() {
                         Spacer(Modifier.height(10.dp))
                         Text(status, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                         Text(
-                            if (selectedDeviceName.isBlank()) "차량 블루투스를 등록하면 연결 해제 시 주차 위치를 기록합니다."
+                            if (selectedDeviceName.isBlank()) "차량 블루투스를 등록하면 연결 해제 시 주차 시각과 층을 자동 기록합니다. 주차 칸은 별도 인식이 필요합니다."
                             else "감지 차량: $selectedDeviceName",
                             color = Color(0xFF9BAABD), style = MaterialTheme.typography.bodyMedium
                         )
@@ -280,7 +280,7 @@ private fun ParkingFinderApp() {
                                 bluetoothPermission.launch(arrayOf(Manifest.permission.BLUETOOTH_CONNECT))
                             } else {
                                 ContextCompat.startForegroundService(context, Intent(context, CarBluetoothMonitorService::class.java))
-                                status = "차량 블루투스 연결 해제 및 GPS 자동 기록 중"
+                                status = "차량 연결 해제·GPS·기압 센서 자동 감지 중"
                                 prefs.edit().putString("monitor_status", status).apply()
                             }
                         }, modifier = Modifier.fillMaxWidth()) {
@@ -296,7 +296,7 @@ private fun ParkingFinderApp() {
                 }, modifier = Modifier.fillMaxWidth()) {
                     Icon(Icons.Default.Map, null); Text(" 주차 기록")
                 }
-                Text("차량 블루투스 연결 해제는 주차 시점을 감지합니다. 주차면은 통로형 지도에서 선택하고 기둥 번호는 직접 입력하거나 OCR로 읽어 저장합니다.",
+                Text("차량 블루투스 연결 해제 시 주차 시각을 자동 기록하고, GPS와 기압 센서로 지하 층을 추정합니다. 주차 칸은 별도 인식이 필요합니다.",
                     color = Color(0xFF8291A5), style = MaterialTheme.typography.labelSmall)
             }
         }
