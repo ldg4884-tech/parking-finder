@@ -22,6 +22,11 @@ import android.os.Handler
 import android.os.Looper
 import android.webkit.JavascriptInterface
 import android.webkit.WebView
+import android.webkit.WebViewClient
+import android.webkit.WebChromeClient
+import android.webkit.ConsoleMessage
+import android.view.ViewGroup
+import android.graphics.Color
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts
@@ -65,7 +70,14 @@ class MapActivity : ComponentActivity(), SensorEventListener, LocationListener {
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        web = WebView(this).also { setContentView(it) }
+        web = WebView(this).also {
+            it.layoutParams = ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT
+            )
+            it.setBackgroundColor(Color.WHITE)
+            setContentView(it)
+        }
         ViewCompat.setOnApplyWindowInsetsListener(web) { v, insets ->
             val b = insets.getInsets(WindowInsetsCompat.Type.systemBars())
             v.setPadding(b.left, b.top, b.right, b.bottom); insets
@@ -73,6 +85,38 @@ class MapActivity : ComponentActivity(), SensorEventListener, LocationListener {
         registerWifiReceiver()
         web.settings.javaScriptEnabled = true
         web.settings.domStorageEnabled = true
+        web.settings.allowFileAccess = true
+        web.settings.allowContentAccess = true
+        web.settings.useWideViewPort = true
+        web.settings.loadWithOverviewMode = true
+        web.webViewClient = object : WebViewClient() {
+            override fun onReceivedError(
+                view: WebView,
+                request: android.webkit.WebResourceRequest,
+                error: android.webkit.WebResourceError
+            ) {
+                super.onReceivedError(view, request, error)
+                if (request.isForMainFrame) {
+                    val message = "지도 파일을 불러오지 못했습니다. 앱을 다시 실행해 주세요."
+                    view.loadDataWithBaseURL(
+                        null,
+                        "<html><meta name='viewport' content='width=device-width, initial-scale=1'><body style='font-family:sans-serif;padding:24px;background:#101827;color:white'><h2>지도를 불러오지 못했어요</h2><p>$message</p><button onclick='location.reload()' style='padding:14px'>다시 시도</button></body></html>",
+                        "text/html", "UTF-8", null
+                    )
+                }
+            }
+        }
+        web.webChromeClient = object : WebChromeClient() {
+            override fun onConsoleMessage(message: ConsoleMessage): Boolean {
+                if (message.messageLevel() == ConsoleMessage.MessageLevel.ERROR) {
+                    android.util.Log.e(
+                        "ParkingFinderMap",
+                        "${message.message()} (line ${message.lineNumber()})"
+                    )
+                }
+                return true
+            }
+        }
         web.addJavascriptInterface(Bridge(), "Android")
         web.loadUrl("file:///android_asset/map.html")
         sm = getSystemService(SENSOR_SERVICE) as SensorManager
