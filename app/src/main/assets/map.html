@@ -2,15 +2,15 @@
 :root{--bg:#f4f7fb;--cd:#fff;--tx:#1f2a44;--mu:#6b7a99;--ac:#16a085;--wa:#ff9f1c;--rd:#e5484d;--ln:#c9d3e3;--st:#74d3c0;--ss:#3fae98;color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
 @media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#121826;--cd:#1c2538;--tx:#e8edf7;--mu:#9aa8c4;--ln:#34415c;--st:#2f8f7f;--ss:#52c2ae;color-scheme:dark}}
 :root[data-theme="dark"]{--bg:#121826;--cd:#1c2538;--tx:#e8edf7;--mu:#9aa8c4;--ln:#34415c;--st:#2f8f7f;--ss:#52c2ae;color-scheme:dark}
-html,body{height:100%;margin:0}html{scroll-padding-top:env(safe-area-inset-top,0px)}
-body{background:var(--bg);color:var(--tx);font:15px/1.45 system-ui,"Noto Sans KR","Apple SD Gothic Neo",sans-serif;display:flex;flex-direction:column}
-header{padding:10px 14px;background:var(--cd);border-bottom:1px solid var(--ln)}h1{font-size:17px;margin:0}.sub{color:var(--mu);font-size:12px;margin-top:2px}
+html,body{height:100%;margin:0;overflow:hidden}html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{height:100dvh;min-height:100%;overflow:hidden;background:var(--bg);color:var(--tx);font:15px/1.45 system-ui,"Noto Sans KR","Apple SD Gothic Neo",sans-serif;display:flex;flex-direction:column}
+header{flex:0 0 auto;padding:10px 14px;background:var(--cd);border-bottom:1px solid var(--ln)}h1{font-size:17px;margin:0}.sub{color:var(--mu);font-size:12px;margin-top:2px}
 nav{display:flex;gap:6px;margin:8px 0 4px}nav#subtb{margin:0 0 4px}nav#subtb button{padding:6px 4px;font-size:12px}nav button{flex:1;padding:8px 4px;border-radius:10px;border:1px solid var(--ln);background:var(--bg);color:var(--mu);font-size:13px;font-weight:600}nav button.on{background:var(--ac);border-color:var(--ac);color:#fff}
-.wrap{position:relative;flex:1;min-height:0}.map{position:absolute;inset:0;overflow:auto;background:var(--bg)}
+.wrap{position:relative;flex:1 1 0;min-height:220px}.map{position:absolute;inset:0;overflow:auto;background:var(--bg)}
 #m{display:block;width:100%;height:auto;max-width:none;margin:0 auto;flex:none}
 .zb{position:absolute;right:10px;top:10px;display:flex;flex-direction:column;gap:6px;z-index:2}
 .zb button{width:40px;height:40px;border-radius:12px;border:1px solid var(--ln);background:var(--cd);color:var(--tx);font-size:18px}
-.panel{background:var(--cd);border-top:1px solid var(--ln);padding:12px 14px}.panel p{margin:0 0 8px}.mu{color:var(--mu);font-size:12px}
+.panel{flex:0 1 auto;max-height:32dvh;overflow-y:auto;overscroll-behavior:contain;background:var(--cd);border-top:1px solid var(--ln);padding:12px 14px}.panel p{margin:0 0 8px}.mu{color:var(--mu);font-size:12px}
 .row{display:flex;gap:8px}.row button{flex:1;padding:12px;border-radius:12px;border:1px solid var(--ln);background:var(--cd);color:var(--tx);font-size:15px;font-weight:600}
 .row .pri{background:var(--ac);border-color:var(--ac);color:#fff}.row .dg{color:var(--rd)}
 .fl polygon{fill:var(--cd);stroke:var(--ln);stroke-width:6;stroke-linejoin:round}.s{fill:var(--st);stroke:var(--ss);stroke-width:.8}
@@ -55,7 +55,7 @@ function build(){const d=D[cur];S=d.s;C=d.c;W=d.w;H=d.h;u=W/989;m.setAttribute('
  S.forEach(s=>{h+='<rect class="s" x="'+(s[0]-s[2]/2+.5)+'" y="'+(s[1]-s[3]/2+.5)+'" width="'+(s[2]-1)+'" height="'+(s[3]-1)+'" rx="2"/>'});
  d.f.forEach(f=>{const w=(f[0].length*25+34)*u;h+='<rect class="pl" x="'+(f[1]-w/2)+'" y="'+(f[2]-22*u)+'" width="'+w+'" height="'+44*u+'" rx="'+22*u+'"/><text class="pt" style="font-size:'+24*u+'px" x="'+f[1]+'" y="'+f[2]+'">'+f[0]+'</text>'});
  for(const k in C){h+='<circle class="co" cx="'+C[k][0]+'" cy="'+C[k][1]+'" r="'+34*u+'"/><text class="cn" style="font-size:'+30*u+'px" x="'+C[k][0]+'" y="'+C[k][1]+'">'+k+'</text>';const dn=dongFor(cur,k);if(dn)h+='<text class="cdong" style="font-size:'+17*u+'px" x="'+C[k][0]+'" y="'+(C[k][1]+52*u)+'">'+dn+'</text>'}
- m.innerHTML=h+'<g id="pm"></g><g id="mk"></g>';renderPillarMarks();zoom(1);requestAnimationFrame(()=>{const fit=Math.min(mp.clientWidth/W,mp.clientHeight/H);if(fit>0){m.style.width=(W*fit)+'px';m.style.height=(H*fit)+'px'}mp.scrollTo(0,0)});sel=-1;mark();panel();
+ m.innerHTML=h+'<g id="pm"></g><g id="mk"></g>';renderPillarMarks();zoom(1);requestAnimationFrame(()=>{const fit=mp.clientWidth/W;if(fit>0){m.style.width=(W*fit)+'px';m.style.height=(H*fit)+'px'}mp.scrollTo(0,0)});sel=-1;mark();panel();
  $('tb').innerHTML=['a','c'].map(k=>'<button data-k="'+k+'" class="'+((k==='a'&&cur!=='c'||k==='c'&&cur==='c')?'on':'')+'">'+(k==='a'?'B1':'B2')+'</button>').join('');
  $('subtb').innerHTML=cur==='c'?'':'<button data-k="a" class="'+(cur==='a'?'on':'')+'">B1 지도 자료 ①</button><button data-k="b" class="'+(cur==='b'?'on':'')+'">B1 지도 자료 ②</button>';
  document.querySelectorAll('#tb button,#subtb button').forEach(b=>b.onclick=()=>{pillarMode='';cur=b.dataset.k;build()})}
@@ -65,7 +65,7 @@ function mark(){let o='';const one=(i,c,car)=>{const s=S[i];o+='<rect x="'+(s[0]
  const here=sv&&sv.k===cur;if(prediction&&prediction.k===cur)one(prediction.i,'var(--ac)',0);if(here)one(sv.i,'var(--rd)',1);if(sel>=0&&!(here&&sv.i===sel))one(sel,'var(--wa)',0);
  $('mk').innerHTML=o}
 function go(x,y){const k=m.clientWidth/W;mp.scrollTo({left:x*k-mp.clientWidth/2,top:y*k-mp.clientHeight/2,behavior:'smooth'})}
-function zoom(v,x,y){z=Math.max(1,Math.min(5,v));const fit=Math.min(mp.clientWidth/W,mp.clientHeight/H);const base=(Number.isFinite(fit)&&fit>0)?fit:mp.clientWidth/W;m.style.width=(W*base*z)+'px';m.style.height=(H*base*z)+'px';if(x!=null)requestAnimationFrame(()=>go(x,y))}
+function zoom(v,x,y){z=Math.max(1,Math.min(5,v));const fit=mp.clientWidth/W;const base=(Number.isFinite(fit)&&fit>0)?fit:mp.clientWidth/W;m.style.width=(W*base*z)+'px';m.style.height=(H*base*z)+'px';if(x!=null)requestAnimationFrame(()=>go(x,y))}
 function learningStatsHtml(){if(!window.Android||!Android.learningStats)return'<p>기록 현황을 불러올 수 없습니다.</p>';try{const s=JSON.parse(Android.learningStats());const m=s.maps;const n=['a','b','c'].reduce((v,k)=>v+m[k].withWifi,0);return'<p>전체 '+s.total+'건 · Wi-Fi 신호 3개 이상 저장 '+n+'건</p><small>B1 지도 ① '+m.a.total+'건('+m.a.withWifi+'건 신호 포함) · B1 지도 ② '+m.b.total+'건('+m.b.withWifi+'건 신호 포함) · B2 '+m.c.total+'건('+m.c.withWifi+'건 신호 포함)</small>'}catch(e){return'<p>기록 현황을 불러오지 못했습니다.</p>'}}
 function panel(){let p='';
  if(sel>=0){const ck=core(sel),dn=dongFor(cur,ck);p+='<p><b>선택한 칸: '+L[cur]+(cur==='c'?'':' · 지도 자료 '+(cur==='a'?'①':'②'))+' · 지도 기준점 '+ck+' 근처</b><br><span class="mu">연결된 동: '+(dn||'아직 지정되지 않음')+'</span></p><div class="row"><button class="pri" id="sv">이 위치를 학습 데이터로 저장</button></div><p style="margin-top:10px"><label for="dongPick">이 코어의 승강기에서 연결되는 동</label></p><div class="row"><select id="dongPick" style="flex:1;padding:11px;border-radius:10px;border:1px solid var(--ln);background:var(--bg);color:var(--tx)"><option value="">동 연결 안 함</option>'+dongOptions.map(d=>'<option value="'+d+'" '+(dn===d?'selected':'')+'>'+d+'</option>').join('')+'</select><button id="dongSave">동 연결 저장</button></div>';}
@@ -83,7 +83,7 @@ m.addEventListener('click',e=>{if(e.target.closest&&e.target.closest('.pillarPin
  let b=-1,bd=1e9;S.forEach((s,i)=>{const d=Math.hypot(s[0]-q.x,s[1]-q.y);if(d<bd){bd=d;b=i}});
  sel=bd<16*u?b:-1;mark();panel()});
 $('zi').onclick=()=>zoom(z+1);$('zo').onclick=()=>zoom(z-1);$('z1').onclick=()=>{zoom(1);mp.scrollTo(0,0)};
-const mapResizeObserver=new ResizeObserver(()=>{if(z===1&&W&&H){const fit=Math.min(mp.clientWidth/W,mp.clientHeight/H);if(fit>0){m.style.width=(W*fit)+'px';m.style.height=(H*fit)+'px'}}});mapResizeObserver.observe(mp);
+const mapResizeObserver=new ResizeObserver(()=>{if(z===1&&W&&H){const fit=mp.clientWidth/W;if(fit>0){m.style.width=(W*fit)+'px';m.style.height=(H*fit)+'px'}}});mapResizeObserver.observe(mp);
 window.addEventListener('resize',()=>{if(z===1)requestAnimationFrame(()=>zoom(1))});
 document.addEventListener('click',e=>{if(e.target.closest&&e.target.closest('#tb,#subtb'))manual=Date.now()},true);
 function poll(){if(!window.Android)return;try{const s=JSON.parse(Android.state());
