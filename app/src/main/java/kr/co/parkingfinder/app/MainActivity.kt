@@ -126,11 +126,6 @@ private fun ParkingFinderApp() {
                             onClick = { context.startActivity(Intent(context, MapActivity::class.java)) },
                             modifier = Modifier.fillMaxWidth()
                         ) { Text("주차장 지도 열기") }
-                        Text(
-                            "현재 선택 층: $selectedFloor",
-                            color = Color(0xFF75D5C2),
-                            style = MaterialTheme.typography.bodySmall
-                        )
                     }
                 }
                 Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF172334)),
@@ -153,7 +148,7 @@ private fun ParkingFinderApp() {
                             color = Color(0xFF9BAABD), style = MaterialTheme.typography.bodyMedium
                         )
                         Spacer(Modifier.height(8.dp))
-                        Text("공식 주차장 도면이 없어도 층과 기둥 번호를 직접 저장할 수 있습니다.",
+                        Text("지도에서 실제 주차 칸을 선택해 위치를 직접 기록할 수 있습니다.",
                             color = Color(0xFF9BAABD), style = MaterialTheme.typography.bodySmall)
                         Button(
                             onClick = {
