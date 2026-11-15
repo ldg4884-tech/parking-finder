@@ -13,6 +13,7 @@ import android.location.LocationListener
 import android.location.LocationManager
 import android.net.wifi.WifiManager
 import android.os.Bundle
+import android.os.SystemClock
 import android.os.Handler
 import android.os.Looper
 import android.webkit.JavascriptInterface
@@ -116,7 +117,7 @@ class MapActivity : ComponentActivity(), SensorEventListener, LocationListener {
                             .put("bssid", result.BSSID ?: "")
                             .put("rssi", result.level)
                             .put("frequency", result.frequency)
-                            .put("ageMs", (System.currentTimeMillis() - result.timestamp / 1000L).coerceAtLeast(0L)))
+                            .put("ageMs", (SystemClock.elapsedRealtime() - result.timestamp / 1000L).coerceAtLeast(0L)))
                     }
                 }
             }
