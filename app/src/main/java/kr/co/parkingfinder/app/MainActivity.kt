@@ -32,14 +32,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
-import java.io.File
-import java.io.FileOutputStream
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-import com.google.mlkit.vision.common.InputImage
-import com.google.mlkit.vision.text.TextRecognition
-import com.google.mlkit.vision.text.korean.KoreanTextRecognizerOptions
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -58,8 +53,6 @@ private fun ParkingFinderApp() {
     var hasLocation by remember { mutableStateOf(savedAt.isNotBlank()) }
     var status by remember { mutableStateOf(prefs.getString("monitor_status", "주차 감지 준비") ?: "") }
     var selectedDeviceName by remember { mutableStateOf(prefs.getString("car_bt_name", "") ?: "") }
-    var manualZoneLabel by remember { mutableStateOf(prefs.getString("last_detected_zone", "") ?: "") }
-    var ocrBusy by remember { mutableStateOf(false) }
     var detectedSpotText by remember { mutableStateOf(prefs.getString("last_detected_spot", "아직 저장된 주차 구역이 없습니다") ?: "") }
     val activity = context as? ComponentActivity
     DisposableEffect(activity) {
@@ -71,7 +64,6 @@ private fun ParkingFinderApp() {
                 status = prefs.getString("monitor_status", "주차 감지 준비") ?: "주차 감지 준비"
                 selectedDeviceName = prefs.getString("car_bt_name", "") ?: ""
                 detectedSpotText = prefs.getString("last_detected_spot", "아직 저장된 주차 구역이 없습니다") ?: ""
-                manualZoneLabel = prefs.getString("last_detected_zone", "") ?: ""
             }
         }
         activity?.lifecycle?.addObserver(observer)
@@ -81,61 +73,6 @@ private fun ParkingFinderApp() {
     var pairedDevices by remember { mutableStateOf(emptyList<BluetoothDevice>()) }
     var showHistory by remember { mutableStateOf(false) }
     var historyItems by remember { mutableStateOf(emptyList<String>()) }
-    var selectedFloor by remember { mutableStateOf(prefs.getString("selected_floor", "B1") ?: "B1") }
-    val floors = listOf("B2", "B1")
-    var selectedParkingBay by remember(selectedFloor) {
-        mutableStateOf(prefs.getString("selected_bay_$selectedFloor", "") ?: "")
-    }
-
-    val pillarCamera = rememberLauncherForActivityResult(
-        ActivityResultContracts.TakePicturePreview()
-    ) { bitmap ->
-        if (bitmap == null) {
-            status = "촬영이 취소되었습니다."
-        } else {
-            ocrBusy = true
-            status = "사진을 저장하고 기둥 번호를 읽는 중입니다."
-            val photoFile = File(context.filesDir, "parking_training/" + System.currentTimeMillis() + ".jpg")
-            val photoSaved = runCatching {
-                photoFile.parentFile?.mkdirs()
-                FileOutputStream(photoFile).use { output ->
-                    bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 88, output)
-                }
-                prefs.edit().putString("pending_training_photo", photoFile.absolutePath).apply()
-                true
-            }.getOrDefault(false)
-            val recognizer = TextRecognition.getClient(KoreanTextRecognizerOptions.Builder().build())
-            recognizer.process(InputImage.fromBitmap(bitmap, 0))
-                .addOnSuccessListener { visionText ->
-                    val lines: List<String> = visionText.textBlocks.mapNotNull { block -> block.text.trim().takeIf { value -> value.isNotEmpty() } }
-                    val rawText = visionText.text.trim()
-                    val compactText = rawText.replace("\\s".toRegex(), "")
-                    val pillarMatch = Regex("(?i)(\\d{1,2})([A-Z])").find(compactText)
-                    val pillarCode = pillarMatch?.let { it.groupValues[1] + it.groupValues[2].uppercase(Locale.ROOT) } ?: ""
-                    prefs.edit()
-                        .putString("pending_training_ocr", rawText)
-                        .putString("pending_training_pillar", pillarCode)
-                        .putLong("pending_training_photo_time", System.currentTimeMillis())
-                        .apply()
-                    val candidate = if (pillarCode.isNotBlank()) pillarCode else lines.firstOrNull { line ->
-                        line.any { it.isDigit() } && line.length <= 30
-                    } ?: lines.firstOrNull { it.isNotBlank() }
-                    if (candidate.isNullOrBlank()) {
-                        status = if (photoSaved) "사진은 저장했습니다. 번호를 읽지 못해 직접 입력해 주세요." else "사진 저장과 번호 인식에 실패했습니다. 다시 촬영해 주세요."
-                    } else {
-                        manualZoneLabel = candidate
-                        status = "인식 결과를 입력란에 넣었습니다. 지도에서 주차 칸을 확정하면 학습 데이터로 저장됩니다."
-                    }
-                    recognizer.close()
-                    ocrBusy = false
-                }
-                .addOnFailureListener {
-                    status = "문자 인식에 실패했습니다. 다시 촬영해 주세요."
-                    ocrBusy = false
-                    recognizer.close()
-                }
-        }
-    }
 
     val locationPermission = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -180,14 +117,6 @@ private fun ParkingFinderApp() {
                     colors = CardDefaults.cardColors(containerColor = Color(0xFF172334)),
                     shape = RoundedCornerShape(22.dp)) {
                     Column(Modifier.fillMaxSize().padding(12.dp)) {
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            floors.forEach { floor ->
-                                FilterChip(selected = selectedFloor == floor, onClick = {
-                                    selectedFloor = floor
-                                    prefs.edit().putString("selected_floor", floor).apply()
-                                }, label = { Text(floor) })
-                            }
-                        }
                         Text(
                             "임시 A~D 구역 배치도는 제거했습니다. 실제 주차 위치는 지도 화면에서 선택하세요.",
                             color = Color(0xFF9BAABD),
@@ -226,58 +155,12 @@ private fun ParkingFinderApp() {
                         Spacer(Modifier.height(8.dp))
                         Text("공식 주차장 도면이 없어도 층과 기둥 번호를 직접 저장할 수 있습니다.",
                             color = Color(0xFF9BAABD), style = MaterialTheme.typography.bodySmall)
-                        OutlinedTextField(
-                            value = manualZoneLabel,
-                            onValueChange = { manualZoneLabel = it },
-                            modifier = Modifier.fillMaxWidth(),
-                            singleLine = true,
-                            label = { Text("주차 위치 / 기둥 번호") },
-                            placeholder = { Text("예: 125번 기둥, A구역 12번") }
-                        )
-                        OutlinedButton(
-                            onClick = { pillarCamera.launch(null) },
-                            enabled = !ocrBusy,
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text("📷  " + if (ocrBusy) "번호 인식 중..." else "기둥 번호 카메라로 촬영")
-                        }
                         Button(
                             onClick = {
-                                if (!prefs.getString("pending_training_photo", null).isNullOrBlank()) {
-                                    status = "촬영한 표지판과 실제 주차 칸을 연결합니다. 지도에서 내 차가 주차된 칸을 선택해 주세요."
-                                    context.startActivity(Intent(context, MapActivity::class.java))
-                                } else if (manualZoneLabel.isBlank() && selectedParkingBay.isBlank()) {
-                                    status = "기둥 번호를 입력하거나 지도에서 주차면을 선택해 주세요."
-                                } else {
-                                    val zone = listOf(manualZoneLabel.trim(), selectedParkingBay).filter { it.isNotBlank() }.joinToString(" · ")
-                                    val now = System.currentTimeMillis()
-                                    val time = SimpleDateFormat("yyyy.MM.dd HH:mm", Locale.KOREA).format(Date(now))
-                                    val spot = "$selectedFloor $zone"
-                                    val history = (prefs.getStringSet("parking_history", emptySet()) ?: emptySet()).toMutableSet()
-                                    history.add("$time  |  $spot  |  직접 저장")
-                                    prefs.edit()
-                                        .putString("manual_saved_floor", selectedFloor)
-                                        .putString("manual_saved_zone", zone)
-                                        .putString("manual_saved_bay", selectedParkingBay)
-                                        .putString("manual_saved_spot", spot)
-                                        .putString("manual_saved_time", time)
-                                        .putString("selected_bay_$selectedFloor", selectedParkingBay)
-                                        .putString("last_detected_spot", "마지막 직접 저장 위치: $spot")
-                                        .putString("last_location", spot)
-                                        .putString("last_time", time)
-                                        .putString("selected_floor", selectedFloor)
-                                        .putString("monitor_status", "$spot 주차 위치 저장 완료")
-                                        .putStringSet("parking_history", history)
-                                        .apply()
-                                    detectedSpotText = "마지막 주차 위치: $spot"
-                                    locationText = spot
-                                    savedAt = time
-                                    hasLocation = true
-                                    status = "$spot 위치를 저장했습니다."
-                                }
+                                context.startActivity(Intent(context, MapActivity::class.java))
                             },
                             modifier = Modifier.fillMaxWidth()
-                        ) { Text("이 주차 위치 저장") }
+                        ) { Text("지도에서 내 주차 위치 선택 · 학습 데이터 저장") }
                         Text(detectedSpotText, color = Color(0xFF9CE8D8), style = MaterialTheme.typography.bodySmall)
                         Spacer(Modifier.height(12.dp))
                         Button(onClick = {
@@ -312,7 +195,7 @@ private fun ParkingFinderApp() {
                         }
                     }
                 }
-                Text("주차 후 기둥 표지판을 촬영하고 지도에서 실제 주차 칸을 확정하면 사진·OCR·지도 좌표·주변 Wi-Fi 신호·센서 정보가 학습 데이터로 쌓입니다.",
+                Text("주차 후 지도에서 내 차가 있는 칸을 선택하면 해당 위치와 주변 Wi-Fi 신호·층·센서 정보가 학습 데이터로 쌓입니다.",
                     color = Color(0xFF8291A5), style = MaterialTheme.typography.labelSmall)
                 OutlinedButton(onClick = {
                     historyItems = (prefs.getStringSet("parking_history", emptySet()) ?: emptySet()).toList().sortedDescending()
