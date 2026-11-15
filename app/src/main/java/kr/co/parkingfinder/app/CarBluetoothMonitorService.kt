@@ -14,21 +14,46 @@ import android.content.pm.PackageManager
 import android.location.Location
 import android.location.LocationListener
 import android.location.LocationManager
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
 import android.os.Build
 import android.os.Bundle
 import android.os.IBinder
+import android.os.Handler
 import android.os.Looper
 import androidx.core.app.NotificationCompat
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-class CarBluetoothMonitorService : Service() {
+class CarBluetoothMonitorService : Service(), SensorEventListener {
     private val channelId = "parking_monitor"
     private var receiverRegistered = false
     private var locationUpdatesStarted = false
+    private lateinit var sensorManager: SensorManager
+    private var pressureSensor: Sensor? = null
+    private val floorEstimator = FloorEstimator()
+    private val floorHandler = Handler(Looper.getMainLooper())
+    private val floorTicker = object : Runnable {
+        override fun run() {
+            val now = System.currentTimeMillis()
+            floorEstimator.tick(now)
+            val key = floorEstimator.floorKey
+            if (floorEstimator.underground && key != null) {
+                val floor = if (key == "c") "B2" else "B1"
+                getSharedPreferences("parking_finder", MODE_PRIVATE).edit()
+                    .putString("estimated_floor", floor)
+                    .putLong("estimated_floor_updated_at", now)
+                    .apply()
+            }
+            floorHandler.postDelayed(this, 1_000L)
+        }
+    }
     private val locationListener = object : LocationListener {
         override fun onLocationChanged(location: Location) {
+            floorEstimator.onFix(System.currentTimeMillis(), location.accuracy)
             val prefs = getSharedPreferences("parking_finder", MODE_PRIVATE)
             prefs.edit()
                 .putString("latest_latitude", location.latitude.toString())
@@ -64,11 +89,16 @@ class CarBluetoothMonitorService : Service() {
         super.onCreate()
         createNotificationChannel()
         registerBluetoothReceiver()
+        sensorManager = getSystemService(SENSOR_SERVICE) as SensorManager
+        pressureSensor = sensorManager.getDefaultSensor(Sensor.TYPE_PRESSURE)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         startForeground(1001, buildNotification("차량 블루투스 연결 감지 중 · 위치 수집 준비"))
         startLocationUpdates()
+        pressureSensor?.let { sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_NORMAL) }
+        floorHandler.removeCallbacks(floorTicker)
+        floorHandler.post(floorTicker)
         return START_STICKY
     }
 
@@ -86,7 +116,7 @@ class CarBluetoothMonitorService : Service() {
         try {
             for (provider in listOf(LocationManager.NETWORK_PROVIDER, LocationManager.GPS_PROVIDER)) {
                 if (manager.isProviderEnabled(provider)) {
-                    manager.requestLocationUpdates(provider, 60_000L, 15f, locationListener, Looper.getMainLooper())
+                    manager.requestLocationUpdates(provider, 15_000L, 5f, locationListener, Looper.getMainLooper())
                     started = true
                 }
             }
@@ -139,6 +169,11 @@ class CarBluetoothMonitorService : Service() {
             })
         }
         val now = System.currentTimeMillis()
+        floorEstimator.tick(now)
+        val estimatedFloor = if (floorEstimator.underground) {
+            floorEstimator.floorKey?.let { if (it == "c") "B2" else "B1" }
+        } else null
+        val floorText = estimatedFloor?.let { " · $it 층 추정" } ?: " · 층 확인 필요"
         val time = SimpleDateFormat("yyyy.MM.dd HH:mm", Locale.KOREA).format(Date(now))
         val location = candidates.maxByOrNull { it.time }
         val ageMinutes = location?.let { ((now - it.time).coerceAtLeast(0L) / 60000L) }
@@ -151,17 +186,19 @@ class CarBluetoothMonitorService : Service() {
         } else {
             "GPS 위치 정보 없음"
         }
-        val status = if (locationUsable) "주차 시점 자동 기록 완료 · 기둥 번호 확인 필요"
-            else "주차 시점 자동 기록 완료 · GPS 위치 없음, 기둥 번호 확인 필요"
+        val status = if (locationUsable) "주차 시점 자동 기록 완료$floorText · 주차 칸은 별도 인식 필요"
+            else "주차 시점 자동 기록 완료$floorText · GPS 위치 없음 · 주차 칸은 별도 인식 필요"
+        val spotText = estimatedFloor?.let { "자동 추정 층: $it · 주차 칸은 아직 확인되지 않았습니다" }
+            ?: "층·주차 칸 미확인 · 지도에서 확인하거나 기둥 번호를 입력해 주세요"
         val history = (prefs.getStringSet("parking_history", emptySet()) ?: emptySet()).toMutableSet()
         history.add("$time  |  $gpsText  |  차량 블루투스 해제 자동 기록")
         prefs.edit()
             .putString("last_auto_parking_time", time)
             .putString("last_time", time)
-            .putString("last_location", "주차 시점 자동 기록됨 · $gpsText · 기둥 번호 확인 필요")
+            .putString("last_location", "주차 시점 자동 기록됨$floorText · $gpsText")
             .putString("monitor_status", status)
-            .putString("last_detected_spot", "기둥 번호 미확인 · 사진 촬영 또는 직접 입력 가능")
-            .remove("last_detected_floor")
+            .putString("last_detected_spot", spotText)
+            .putString("last_detected_floor", estimatedFloor)
             .remove("last_detected_zone")
             .remove("last_detected_marker_x")
             .remove("last_detected_marker_y")
@@ -193,7 +230,17 @@ class CarBluetoothMonitorService : Service() {
         getSystemService(NotificationManager::class.java).notify(1001, buildNotification(message))
     }
 
+    override fun onSensorChanged(event: SensorEvent) {
+        if (event.sensor.type == Sensor.TYPE_PRESSURE && event.values.isNotEmpty()) {
+            floorEstimator.onPressure(System.currentTimeMillis(), event.values[0].toDouble())
+        }
+    }
+
+    override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) = Unit
+
     override fun onDestroy() {
+        floorHandler.removeCallbacks(floorTicker)
+        try { sensorManager.unregisterListener(this) } catch (_: UninitializedPropertyAccessException) { }
         if (locationUpdatesStarted) {
             try { getSystemService(LocationManager::class.java).removeUpdates(locationListener) }
             catch (_: SecurityException) { }
