@@ -34,8 +34,14 @@ open class ParkingWidgetProvider : AppWidgetProvider() {
             views.setTextViewText(R.id.widget_location, if (saved) location else "위치 확인 필요")
             views.setTextViewText(R.id.widget_time,
                 if (saved) "저장 시각 · $time" else "주차 후 지도에서 위치를 저장하세요")
-            views.setTextViewText(R.id.widget_status,
-                if (saved) "최근 저장 위치" else "아직 저장된 주차 위치가 없습니다")
+            val detail = prefs.getString("last_detected_spot", "").orEmpty()
+            val label = when {
+                !saved -> "아직 저장된 주차 위치가 없습니다"
+                detail.startsWith("자동 추정:") -> "Wi-Fi 자동 추정 · 위치 확인 권장"
+                location.startsWith("주차 시점 자동 기록됨") -> "자동 기록 · 주차 칸 미확인"
+                else -> "지도에서 직접 저장한 위치"
+            }
+            views.setTextViewText(R.id.widget_status, label)
             val intent = Intent(context, MapActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
                 putExtra("widget_open_map", true)
