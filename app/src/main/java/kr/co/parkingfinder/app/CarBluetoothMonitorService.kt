@@ -268,6 +268,8 @@ class CarBluetoothMonitorService : Service(), SensorEventListener {
         history.add("$time  |  $spot  |  차량 블루투스 해제 후 Wi-Fi 자동 추정")
         prefs.edit()
             .putString("last_detected_spot", spot)
+            .putString("last_location", spot)
+            .putString("last_time", time)
             .putString("last_detected_floor", floorName)
             .putString("last_auto_prediction_map_key", best.mapKey)
             .putInt("last_auto_prediction_slot_index", best.slot)
@@ -277,6 +279,7 @@ class CarBluetoothMonitorService : Service(), SensorEventListener {
             .putStringSet("parking_history", history)
             .putString("monitor_status", "$spot · 신뢰도 ${"%.0f".format(best.score * 100)}%")
             .apply()
+        ParkingWidgetProvider.refresh(this)
         updateNotification("$spot · 신뢰도 ${"%.0f".format(best.score * 100)}%")
         return true
     }
@@ -355,6 +358,7 @@ class CarBluetoothMonitorService : Service(), SensorEventListener {
             .remove("last_detected_marker_y")
             .putStringSet("parking_history", history)
             .apply()
+        ParkingWidgetProvider.refresh(this)
         updateNotification(status)
     }
 
