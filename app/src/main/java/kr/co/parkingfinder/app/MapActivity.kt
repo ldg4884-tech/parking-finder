@@ -50,7 +50,7 @@ class MapActivity : ComponentActivity(), SensorEventListener, LocationListener {
     private fun registerWifiReceiver() {
         if (wifiReceiverRegistered) return
         val filter = IntentFilter(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION)
-        if (Build.VERSION.SDK_INT >= 33) registerReceiver(wifiScanReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+        if (Build.VERSION.SDK_INT >= 33) registerReceiver(wifiScanReceiver, filter, Context.RECEIVER_EXPORTED)
         else registerReceiver(wifiScanReceiver, filter)
         wifiReceiverRegistered = true
     }
