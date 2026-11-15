@@ -151,7 +151,8 @@ class MapActivity : ComponentActivity(), SensorEventListener, LocationListener {
                 val record = records.optJSONObject(i) ?: continue
                 val mapKey = record.optString("mapKey")
                 if (mapKey !in setOf("a", "b", "c")) continue
-                if (activeFloor != null && mapKey != activeFloor) continue
+                if (activeFloor == "c" && mapKey != "c") continue
+                if (activeFloor in setOf("a", "b") && mapKey !in setOf("a", "b")) continue
                 val slot = record.optInt("slotIndex", -1)
                 if (slot < 0) continue
                 val aps = record.optJSONArray("wifiFingerprint") ?: continue
@@ -173,27 +174,52 @@ class MapActivity : ComponentActivity(), SensorEventListener, LocationListener {
                 val key = "$mapKey:$slot"
                 scores.getOrPut(key) { mutableListOf() }.add(Sample(mapKey, slot, score, common.size))
             }
-            val best = scores.values.mapNotNull { samples ->
+            val ranked = scores.values.mapNotNull { samples ->
                 if (samples.isEmpty()) null else {
                     val top = samples.sortedByDescending { it.score }.take(3)
                     val first = top.first()
                     val average = top.map { it.score }.average()
                     Sample(first.mapKey, first.slot, average, top.minOf { it.matched }) to samples.size
                 }
-            }.maxByOrNull { it.first.score }
+            }.sortedByDescending { it.first.score }
+            val best = ranked.firstOrNull()
             if (best == null) return result.put("ok", false).put("reason", "no_match").toString()
             val candidate = best.first
-            val confident = candidate.score >= 0.65 && candidate.matched >= 3 && best.second >= 2
+            val runnerUpScore = ranked.getOrNull(1)?.first?.score ?: 0.0
+            val margin = (candidate.score - runnerUpScore).coerceAtLeast(0.0)
+            val confident = candidate.score >= 0.65 && candidate.matched >= 3 && best.second >= 2 && margin >= 0.08
             return result.put("ok", true)
                 .put("mapKey", candidate.mapKey)
                 .put("slotIndex", candidate.slot)
                 .put("score", candidate.score)
                 .put("matchedAps", candidate.matched)
-                .put("samples", best.second)
+                 .put("samples", best.second)
+                .put("runnerUpScore", runnerUpScore)
+                .put("margin", margin)
                 .put("confident", confident)
                 .put("signalCount", current.size)
                 .put("floorKey", activeFloor ?: JSONObject.NULL)
                 .toString()
+        }
+        @JavascriptInterface fun learningStats(): String {
+            val records = runCatching {
+                JSONArray(getSharedPreferences("parking_finder", MODE_PRIVATE)
+                    .getString("parking_learning_records", "[]") ?: "[]")
+            }.getOrElse { JSONArray() }
+            val result = JSONObject()
+            val maps = JSONObject()
+            for (key in listOf("a", "b", "c")) {
+                var total = 0
+                var withWifi = 0
+                for (i in 0 until records.length()) {
+                    val record = records.optJSONObject(i) ?: continue
+                    if (record.optString("mapKey") != key) continue
+                    total++
+                    if ((record.optJSONArray("wifiFingerprint")?.length() ?: 0) >= 3) withWifi++
+                }
+                maps.put(key, JSONObject().put("total", total).put("withWifi", withWifi))
+            }
+            return result.put("total", records.length()).put("maps", maps).toString()
         }
         @JavascriptInterface fun state(): String = est.json()
         @JavascriptInterface fun calibrate(key: String) { est.calibrate(key) }
