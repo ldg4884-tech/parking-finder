@@ -16,6 +16,7 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.webkit.JavascriptInterface
+import java.io.File
 import android.webkit.WebView
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -138,7 +139,11 @@ class MapActivity : ComponentActivity(), SensorEventListener, LocationListener {
                 .put("sensorState", est.json())
                 .put("source", "user_confirmed_map")
             records.put(learningRecord)
-            while (records.length() > 200) records.remove(0)
+            while (records.length() > 200) {
+                val expiredPhoto = records.optJSONObject(0)?.optString("photoPath", "") ?: ""
+                if (expiredPhoto.isNotBlank()) runCatching { File(expiredPhoto).delete() }
+                records.remove(0)
+            }
             prefs.edit()
                 .putString("map_saved_floor_key", floorKey)
                 .putInt("map_saved_slot_index", slotIndex)
