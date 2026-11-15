@@ -243,7 +243,10 @@ private fun ParkingFinderApp() {
                         }
                         Button(
                             onClick = {
-                                if (manualZoneLabel.isBlank() && selectedParkingBay.isBlank()) {
+                                if (!prefs.getString("pending_training_photo", null).isNullOrBlank()) {
+                                    status = "촬영한 표지판과 실제 주차 칸을 연결합니다. 지도에서 내 차가 주차된 칸을 선택해 주세요."
+                                    context.startActivity(Intent(context, MapActivity::class.java))
+                                } else if (manualZoneLabel.isBlank() && selectedParkingBay.isBlank()) {
                                     status = "기둥 번호를 입력하거나 지도에서 주차면을 선택해 주세요."
                                 } else {
                                     val zone = listOf(manualZoneLabel.trim(), selectedParkingBay).filter { it.isNotBlank() }.joinToString(" · ")
