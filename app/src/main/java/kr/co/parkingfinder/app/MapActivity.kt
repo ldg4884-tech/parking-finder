@@ -3,6 +3,10 @@ package kr.co.parkingfinder.app
 import android.Manifest
 import android.annotation.SuppressLint
 import android.content.Intent
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.IntentFilter
+import android.os.Build
 import android.content.pm.PackageManager
 import android.hardware.Sensor
 import android.hardware.SensorEvent
@@ -35,6 +39,21 @@ class MapActivity : ComponentActivity(), SensorEventListener, LocationListener {
     private val est = FloorEstimator()
     private val handler = Handler(Looper.getMainLooper())
     private var baro: Sensor? = null
+    private var wifiReceiverRegistered = false
+    private val wifiScanReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            val updated = intent?.getBooleanExtra(WifiManager.EXTRA_RESULTS_UPDATED, false) ?: false
+            web.post { web.evaluateJavascript("window.onWifiScanReady && window.onWifiScanReady($updated)", null) }
+        }
+    }
+
+    private fun registerWifiReceiver() {
+        if (wifiReceiverRegistered) return
+        val filter = IntentFilter(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION)
+        if (Build.VERSION.SDK_INT >= 33) registerReceiver(wifiScanReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+        else registerReceiver(wifiScanReceiver, filter)
+        wifiReceiverRegistered = true
+    }
 
     private val ticker = object : Runnable {
         override fun run() { est.tick(System.currentTimeMillis()); handler.postDelayed(this, 1000) }
@@ -51,6 +70,7 @@ class MapActivity : ComponentActivity(), SensorEventListener, LocationListener {
             val b = insets.getInsets(WindowInsetsCompat.Type.systemBars())
             v.setPadding(b.left, b.top, b.right, b.bottom); insets
         }
+        registerWifiReceiver()
         web.settings.javaScriptEnabled = true
         web.settings.domStorageEnabled = true
         web.addJavascriptInterface(Bridge(), "Android")
@@ -63,6 +83,7 @@ class MapActivity : ComponentActivity(), SensorEventListener, LocationListener {
 
     override fun onResume() {
         super.onResume()
+        registerWifiReceiver()
         baro?.let { sm.registerListener(this, it, SensorManager.SENSOR_DELAY_NORMAL) }
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED)
             startLocation() else askLocation.launch(Manifest.permission.ACCESS_FINE_LOCATION)
@@ -72,6 +93,10 @@ class MapActivity : ComponentActivity(), SensorEventListener, LocationListener {
     override fun onPause() {
         super.onPause()
         sm.unregisterListener(this); lm.removeUpdates(this); handler.removeCallbacks(ticker)
+        if (wifiReceiverRegistered) {
+            runCatching { unregisterReceiver(wifiScanReceiver) }
+            wifiReceiverRegistered = false
+        }
     }
 
     @SuppressLint("MissingPermission")
@@ -88,6 +113,14 @@ class MapActivity : ComponentActivity(), SensorEventListener, LocationListener {
     @Deprecated("API 29 이하 호환용") override fun onStatusChanged(p: String?, s: Int, x: Bundle?) {}
 
     inner class Bridge {
+        @JavascriptInterface fun requestWifiScan(): Boolean {
+            val hasLocation = checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
+                checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+            if (!hasLocation) return false
+            val wifi = applicationContext.getSystemService(WIFI_SERVICE) as WifiManager
+            if (!wifi.isWifiEnabled) return false
+            return runCatching { wifi.startScan() }.getOrDefault(false)
+        }
         @JavascriptInterface fun predictParking(): String {
             val result = JSONObject()
             val permission = checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
@@ -99,7 +132,7 @@ class MapActivity : ComponentActivity(), SensorEventListener, LocationListener {
                 val wifi = applicationContext.getSystemService(WIFI_SERVICE) as WifiManager
                 wifi.scanResults.asSequence()
                     .filter { !it.BSSID.isNullOrBlank() && it.timestamp > 0L }
-                    .filter { (nowElapsed - it.timestamp / 1000L).coerceIn(0L, Long.MAX_VALUE) <= 120_000L }
+                    .filter { (nowElapsed - it.timestamp / 1000L).coerceIn(0L, Long.MAX_VALUE) <= 30_000L }
                     .associate { it.BSSID.lowercase() to it.level }
             }.getOrElse { emptyMap() }
             if (current.size < 3) return result.put("ok", false)
@@ -127,7 +160,7 @@ class MapActivity : ComponentActivity(), SensorEventListener, LocationListener {
                     val ap = aps.optJSONObject(j) ?: continue
                     val bssid = ap.optString("bssid").lowercase()
                     val ageMs = ap.optLong("ageMs", Long.MAX_VALUE)
-                    if (bssid.isNotBlank() && ageMs in 0L..120_000L) sample[bssid] = ap.optInt("rssi")
+                    if (bssid.isNotBlank() && ageMs in 0L..30_000L) sample[bssid] = ap.optInt("rssi")
                 }
                 if (sample.size < 3) continue
                 val common = current.keys.intersect(sample.keys)
@@ -186,7 +219,8 @@ class MapActivity : ComponentActivity(), SensorEventListener, LocationListener {
             if (hasLocationPermission) {
                 runCatching {
                     val wifi = applicationContext.getSystemService(WIFI_SERVICE) as WifiManager
-                    wifi.scanResults.take(40).forEach { result ->
+                    val nowElapsed = SystemClock.elapsedRealtime()
+                    wifi.scanResults.filter { result -> result.timestamp > 0L && (nowElapsed - result.timestamp / 1000L).coerceIn(0L, Long.MAX_VALUE) <= 30_000L }.take(40).forEach { result ->
                         wifiFingerprint.put(JSONObject()
                             .put("bssid", result.BSSID ?: "")
                             .put("rssi", result.level)
