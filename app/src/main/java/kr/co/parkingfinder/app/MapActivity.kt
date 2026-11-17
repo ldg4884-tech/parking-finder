@@ -195,8 +195,7 @@ class MapActivity : ComponentActivity(), SensorEventListener, LocationListener {
                 val record = records.optJSONObject(i) ?: continue
                 val mapKey = record.optString("mapKey")
                 if (mapKey !in setOf("a", "b", "c")) continue
-                if (activeFloor == "c" && mapKey != "c") continue
-                if (activeFloor in setOf("a", "b") && mapKey !in setOf("a", "b")) continue
+                if (activeFloor != null && mapKey != activeFloor) continue
                 val slot = record.optInt("slotIndex", -1)
                 if (slot < 0) continue
                 val aps = record.optJSONArray("wifiFingerprint") ?: continue
@@ -271,12 +270,13 @@ class MapActivity : ComponentActivity(), SensorEventListener, LocationListener {
         @JavascriptInterface fun saveManual(floorKey: String, slotIndex: Int, core: String, timestamp: Long, mapX: Double, mapY: Double) {
             if (floorKey !in setOf("a", "b", "c") || slotIndex < 0 || core.isBlank()) return
             val floorName = when (floorKey) {
-                "a", "b" -> "지하1층"
-                else -> "지하2층"
+                "a" -> "지하2층"
+                "b" -> "1층"
+                else -> "지하1층"
             }
             val time = java.text.SimpleDateFormat("yyyy.MM.dd HH:mm", java.util.Locale.KOREA)
                 .format(java.util.Date(timestamp))
-            val mapPart = if (floorKey == "a") "지도 자료 ①" else if (floorKey == "b") "지도 자료 ②" else ""
+            val mapPart = ""
             val spot = listOf(floorName, mapPart, "지도 기준점 $core 인근", "지도상 ${slotIndex + 1}번 주차면").filter { it.isNotBlank() }.joinToString(" · ")
             val prefs = getSharedPreferences("parking_finder", MODE_PRIVATE)
             val history = (prefs.getStringSet("parking_history", emptySet()) ?: emptySet()).toMutableSet()
