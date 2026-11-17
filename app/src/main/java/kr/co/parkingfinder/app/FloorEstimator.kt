@@ -10,7 +10,7 @@ data class FloorDef(val key: String, val name: String, val elM: Double)
 /**
  * GPS가 끊기는 순간(=지하 진입)의 기압을 기준으로, 이후 기압 변화를 높이 변화로 바꿔
  * 도면의 층별 바닥 높이 중 가장 가까운 층을 고른다.
- * entryElM: 지하로 들어가는 입구(진입 지점)의 바닥 높이 가정값. 기본 31.5 (지하1층-2 데크 입구 기준 가정).
+ * entryElM: 주차장 진입 전 기준 바닥 높이 가정값. 기본 31.5 (1층 데크 출입구 기준 가정).
  */
 class FloorEstimator(
     private val floors: List<FloorDef> = DEFAULT_FLOORS,
@@ -18,9 +18,9 @@ class FloorEstimator(
 ) {
     companion object {
         val DEFAULT_FLOORS = listOf(
-            FloorDef("a", "지하1층-1", 21.5),
-            FloorDef("b", "지하1층-2", 31.5),
-            FloorDef("c", "지하2층", 26.7)
+            FloorDef("a", "지하2층", 21.5),
+            FloorDef("b", "지상1층", 31.5),
+            FloorDef("c", "지하1층", 26.7)
         )
         const val GOOD_ACCURACY_M = 25f
         const val LOST_AFTER_MS = 8_000L

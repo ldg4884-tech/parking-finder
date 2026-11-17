@@ -35,9 +35,6 @@ import androidx.core.content.ContextCompat
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-import com.google.mlkit.vision.common.InputImage
-import com.google.mlkit.vision.text.TextRecognition
-import com.google.mlkit.vision.text.korean.KoreanTextRecognizerOptions
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -56,8 +53,6 @@ private fun ParkingFinderApp() {
     var hasLocation by remember { mutableStateOf(savedAt.isNotBlank()) }
     var status by remember { mutableStateOf(prefs.getString("monitor_status", "주차 감지 준비") ?: "") }
     var selectedDeviceName by remember { mutableStateOf(prefs.getString("car_bt_name", "") ?: "") }
-    var manualZoneLabel by remember { mutableStateOf(prefs.getString("last_detected_zone", "") ?: "") }
-    var ocrBusy by remember { mutableStateOf(false) }
     var detectedSpotText by remember { mutableStateOf(prefs.getString("last_detected_spot", "아직 저장된 주차 구역이 없습니다") ?: "") }
     val activity = context as? ComponentActivity
     DisposableEffect(activity) {
@@ -69,7 +64,6 @@ private fun ParkingFinderApp() {
                 status = prefs.getString("monitor_status", "주차 감지 준비") ?: "주차 감지 준비"
                 selectedDeviceName = prefs.getString("car_bt_name", "") ?: ""
                 detectedSpotText = prefs.getString("last_detected_spot", "아직 저장된 주차 구역이 없습니다") ?: ""
-                manualZoneLabel = prefs.getString("last_detected_zone", "") ?: ""
             }
         }
         activity?.lifecycle?.addObserver(observer)
@@ -79,42 +73,6 @@ private fun ParkingFinderApp() {
     var pairedDevices by remember { mutableStateOf(emptyList<BluetoothDevice>()) }
     var showHistory by remember { mutableStateOf(false) }
     var historyItems by remember { mutableStateOf(emptyList<String>()) }
-    var selectedFloor by remember { mutableStateOf(prefs.getString("selected_floor", "B1") ?: "B1") }
-    val floors = listOf("B2", "B1")
-    var selectedParkingBay by remember(selectedFloor) {
-        mutableStateOf(prefs.getString("selected_bay_$selectedFloor", "") ?: "")
-    }
-
-    val pillarCamera = rememberLauncherForActivityResult(
-        ActivityResultContracts.TakePicturePreview()
-    ) { bitmap ->
-        if (bitmap == null) {
-            status = "촬영이 취소되었습니다."
-        } else {
-            ocrBusy = true
-            status = "기둥 번호를 읽는 중입니다."
-            val recognizer = TextRecognition.getClient(KoreanTextRecognizerOptions.Builder().build())
-            recognizer.process(InputImage.fromBitmap(bitmap, 0))
-                .addOnSuccessListener { visionText ->
-                    val lines: List<String> = visionText.textBlocks.mapNotNull { block -> block.text.trim().takeIf { value -> value.isNotEmpty() } }
-                    val candidate = lines.firstOrNull { line ->
-                        line.any { it.isDigit() } && line.length <= 30
-                    } ?: lines.firstOrNull { it.isNotBlank() }
-                    if (candidate.isNullOrBlank()) {
-                        status = "번호를 읽지 못했습니다. 밝게 촬영하고 다시 시도해 주세요."
-                    } else {
-                        manualZoneLabel = candidate
-                        status = "인식 결과를 입력란에 넣었습니다. 확인 후 저장해 주세요."
-                    }
-                    ocrBusy = false
-                }
-                .addOnFailureListener {
-                    status = "문자 인식에 실패했습니다. 다시 촬영해 주세요."
-                    ocrBusy = false
-                    recognizer.close()
-                }
-        }
-    }
 
     val locationPermission = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -159,14 +117,6 @@ private fun ParkingFinderApp() {
                     colors = CardDefaults.cardColors(containerColor = Color(0xFF172334)),
                     shape = RoundedCornerShape(22.dp)) {
                     Column(Modifier.fillMaxSize().padding(12.dp)) {
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            floors.forEach { floor ->
-                                FilterChip(selected = selectedFloor == floor, onClick = {
-                                    selectedFloor = floor
-                                    prefs.edit().putString("selected_floor", floor).apply()
-                                }, label = { Text(floor) })
-                            }
-                        }
                         Text(
                             "임시 A~D 구역 배치도는 제거했습니다. 실제 주차 위치는 지도 화면에서 선택하세요.",
                             color = Color(0xFF9BAABD),
@@ -176,11 +126,6 @@ private fun ParkingFinderApp() {
                             onClick = { context.startActivity(Intent(context, MapActivity::class.java)) },
                             modifier = Modifier.fillMaxWidth()
                         ) { Text("주차장 지도 열기") }
-                        Text(
-                            "현재 선택 층: $selectedFloor",
-                            color = Color(0xFF75D5C2),
-                            style = MaterialTheme.typography.bodySmall
-                        )
                     }
                 }
                 Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF172334)),
@@ -198,62 +143,19 @@ private fun ParkingFinderApp() {
                         Spacer(Modifier.height(10.dp))
                         Text(status, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                         Text(
-                            if (selectedDeviceName.isBlank()) "차량 블루투스를 등록하면 연결 해제 시 주차 위치를 기록합니다."
-                            else "감지 차량: $selectedDeviceName",
+                            if (selectedDeviceName.isBlank()) "차량 블루투스가 끊기면 주차 시각과 층을 자동 기록하고, 학습 데이터가 충분하면 Wi-Fi로 주차 칸까지 추정합니다."
+                            else "감지 차량: $selectedDeviceName · 연결 해제 시 칸 자동 추정 시도",
                             color = Color(0xFF9BAABD), style = MaterialTheme.typography.bodyMedium
                         )
                         Spacer(Modifier.height(8.dp))
-                        Text("공식 주차장 도면이 없어도 층과 기둥 번호를 직접 저장할 수 있습니다.",
+                        Text("지도에서 실제 주차 칸을 선택해 위치를 직접 기록할 수 있습니다.",
                             color = Color(0xFF9BAABD), style = MaterialTheme.typography.bodySmall)
-                        OutlinedTextField(
-                            value = manualZoneLabel,
-                            onValueChange = { manualZoneLabel = it },
-                            modifier = Modifier.fillMaxWidth(),
-                            singleLine = true,
-                            label = { Text("주차 위치 / 기둥 번호") },
-                            placeholder = { Text("예: 125번 기둥, A구역 12번") }
-                        )
-                        OutlinedButton(
-                            onClick = { pillarCamera.launch(null) },
-                            enabled = !ocrBusy,
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text("📷  " + if (ocrBusy) "번호 인식 중..." else "기둥 번호 카메라로 촬영")
-                        }
                         Button(
                             onClick = {
-                                if (manualZoneLabel.isBlank() && selectedParkingBay.isBlank()) {
-                                    status = "기둥 번호를 입력하거나 지도에서 주차면을 선택해 주세요."
-                                } else {
-                                    val zone = listOf(manualZoneLabel.trim(), selectedParkingBay).filter { it.isNotBlank() }.joinToString(" · ")
-                                    val now = System.currentTimeMillis()
-                                    val time = SimpleDateFormat("yyyy.MM.dd HH:mm", Locale.KOREA).format(Date(now))
-                                    val spot = "$selectedFloor $zone"
-                                    val history = (prefs.getStringSet("parking_history", emptySet()) ?: emptySet()).toMutableSet()
-                                    history.add("$time  |  $spot  |  직접 저장")
-                                    prefs.edit()
-                                        .putString("manual_saved_floor", selectedFloor)
-                                        .putString("manual_saved_zone", zone)
-                                        .putString("manual_saved_bay", selectedParkingBay)
-                                        .putString("manual_saved_spot", spot)
-                                        .putString("manual_saved_time", time)
-                                        .putString("selected_bay_$selectedFloor", selectedParkingBay)
-                                        .putString("last_detected_spot", "마지막 직접 저장 위치: $spot")
-                                        .putString("last_location", spot)
-                                        .putString("last_time", time)
-                                        .putString("selected_floor", selectedFloor)
-                                        .putString("monitor_status", "$spot 주차 위치 저장 완료")
-                                        .putStringSet("parking_history", history)
-                                        .apply()
-                                    detectedSpotText = "마지막 주차 위치: $spot"
-                                    locationText = spot
-                                    savedAt = time
-                                    hasLocation = true
-                                    status = "$spot 위치를 저장했습니다."
-                                }
+                                context.startActivity(Intent(context, MapActivity::class.java))
                             },
                             modifier = Modifier.fillMaxWidth()
-                        ) { Text("이 주차 위치 저장") }
+                        ) { Text("지도에서 내 주차 위치 선택 · 학습 데이터 저장") }
                         Text(detectedSpotText, color = Color(0xFF9CE8D8), style = MaterialTheme.typography.bodySmall)
                         Spacer(Modifier.height(12.dp))
                         Button(onClick = {
@@ -280,7 +182,7 @@ private fun ParkingFinderApp() {
                                 bluetoothPermission.launch(arrayOf(Manifest.permission.BLUETOOTH_CONNECT))
                             } else {
                                 ContextCompat.startForegroundService(context, Intent(context, CarBluetoothMonitorService::class.java))
-                                status = "차량 블루투스 연결 해제 및 GPS 자동 기록 중"
+                                status = "차량 연결 해제·GPS·기압 센서 자동 감지 중"
                                 prefs.edit().putString("monitor_status", status).apply()
                             }
                         }, modifier = Modifier.fillMaxWidth()) {
@@ -288,7 +190,7 @@ private fun ParkingFinderApp() {
                         }
                     }
                 }
-                Text("통로 양쪽 주차면을 선택하고 기둥 번호를 직접 입력하거나 카메라로 인식해 저장하세요.",
+                Text("정확한 자동 주차 칸 추정을 위해 처음에는 지도에서 실제 칸을 직접 저장해 학습 데이터를 모아 주세요.",
                     color = Color(0xFF8291A5), style = MaterialTheme.typography.labelSmall)
                 OutlinedButton(onClick = {
                     historyItems = (prefs.getStringSet("parking_history", emptySet()) ?: emptySet()).toList().sortedDescending()
@@ -296,7 +198,7 @@ private fun ParkingFinderApp() {
                 }, modifier = Modifier.fillMaxWidth()) {
                     Icon(Icons.Default.Map, null); Text(" 주차 기록")
                 }
-                Text("차량 블루투스 연결 해제는 주차 시점을 감지합니다. 주차면은 통로형 지도에서 선택하고 기둥 번호는 직접 입력하거나 OCR로 읽어 저장합니다.",
+                Text("차량 블루투스 연결 해제 시 Wi-Fi를 새로 검색해 저장된 학습 기록과 비교합니다. 동일 칸 3회 이상 기록·유사도 70% 이상·2순위와 12%p 이상 차이가 있을 때만 자동 추정 위치를 저장합니다. 조건을 충족하지 못하면 주차 칸은 확인 필요로 남습니다.",
                     color = Color(0xFF8291A5), style = MaterialTheme.typography.labelSmall)
             }
         }

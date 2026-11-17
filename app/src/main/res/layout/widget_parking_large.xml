@@ -1,0 +1,20 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root" android:layout_width="match_parent" android:layout_height="match_parent"
+    android:orientation="vertical" android:padding="14dp" android:background="#172334">
+    <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="PARKING FINDER"
+        android:textColor="#75D5C2" android:textSize="11sp" android:textStyle="bold" />
+    <TextView android:id="@+id/widget_status" android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_marginTop="4dp" android:text="최근 저장 위치" android:textColor="#AAB8C8" android:textSize="10sp" />
+    <TextView android:id="@+id/widget_location" android:layout_width="match_parent" android:layout_height="0dp"
+        android:layout_weight="1" android:gravity="center_vertical" android:maxLines="2" android:ellipsize="end"
+        android:text="위치 확인 필요" android:textColor="#FFFFFF" android:textSize="15sp" android:textStyle="bold" />
+    <TextView android:id="@+id/widget_time" android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:maxLines="1" android:ellipsize="end" android:text="주차 후 위치를 저장하세요" android:textColor="#AAB8C8" android:textSize="10sp" />
+    <LinearLayout android:layout_width="match_parent" android:layout_height="40dp" android:layout_marginTop="9dp" android:orientation="horizontal">
+        <TextView android:id="@+id/widget_save" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1"
+            android:gravity="center" android:background="#28594F" android:text="주차 위치 저장" android:textColor="#FFFFFF" android:textSize="11sp" android:textStyle="bold" />
+        <TextView android:id="@+id/widget_find" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1"
+            android:layout_marginStart="8dp" android:gravity="center" android:background="#30465D"
+            android:text="내 차 찾기  ›" android:textColor="#FFFFFF" android:textSize="11sp" android:textStyle="bold" />
+    </LinearLayout>
+</LinearLayout>
