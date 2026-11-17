@@ -47,7 +47,7 @@ class CarBluetoothMonitorService : Service(), SensorEventListener {
             floorEstimator.tick(now)
             val key = floorEstimator.floorKey
             if (floorEstimator.underground && key != null) {
-                val floor = if (key == "c") "B2" else "B1"
+                val floor = when (key) { "a" -> "B2"; "b" -> "1층"; else -> "B1" }
                 getSharedPreferences("parking_finder", MODE_PRIVATE).edit()
                     .putString("estimated_floor", floor)
                     .putLong("estimated_floor_updated_at", now)
@@ -208,7 +208,7 @@ class CarBluetoothMonitorService : Service(), SensorEventListener {
         val estimated = prefs.getString("estimated_floor", null)
         val estimatedAt = prefs.getLong("estimated_floor_updated_at", 0L)
         val activeFloor = floorEstimator.floorKey ?: if (System.currentTimeMillis() - estimatedAt <= 120_000L) {
-            when (estimated) { "B2" -> "c"; "B1" -> "a"; else -> null }
+            when (estimated) { "B2" -> "a"; "1층" -> "b"; "B1" -> "c"; else -> null }
         } else null
         if (activeFloor == null) return false
 
@@ -223,8 +223,7 @@ class CarBluetoothMonitorService : Service(), SensorEventListener {
             val record = records.optJSONObject(i) ?: continue
             val mapKey = record.optString("mapKey")
             if (mapKey !in setOf("a", "b", "c")) continue
-            if (activeFloor == "c" && mapKey != "c") continue
-            if (activeFloor in setOf("a", "b") && mapKey !in setOf("a", "b")) continue
+            if (activeFloor != null && mapKey != activeFloor) continue
             val slot = record.optInt("slotIndex", -1)
             if (slot < 0) continue
             val aps = record.optJSONArray("wifiFingerprint") ?: continue
@@ -260,8 +259,8 @@ class CarBluetoothMonitorService : Service(), SensorEventListener {
         // 자동 저장은 엄격하게: 같은 칸 기록 3회 이상, 점수 70% 이상, 2순위와 12%p 이상 차이.
         if (best.score < 0.70 || best.matched < 3 || best.samples < 3 || margin < 0.12) return false
 
-        val floorName = if (best.mapKey == "c") "B2" else "B1"
-        val mapName = when (best.mapKey) { "a" -> "B1 지도 ①"; "b" -> "B1 지도 ②"; else -> "B2" }
+        val floorName = when (best.mapKey) { "a" -> "B2"; "b" -> "1층"; else -> "B1" }
+        val mapName = floorName
         val spot = "자동 추정: $floorName · $mapName · 지도상 ${best.slot + 1}번 주차면"
         val time = SimpleDateFormat("yyyy.MM.dd HH:mm", Locale.KOREA).format(Date())
         val history = (prefs.getStringSet("parking_history", emptySet()) ?: emptySet()).toMutableSet()
@@ -325,7 +324,7 @@ class CarBluetoothMonitorService : Service(), SensorEventListener {
         val now = System.currentTimeMillis()
         floorEstimator.tick(now)
         val estimatedFloor = if (floorEstimator.underground) {
-            floorEstimator.floorKey?.let { if (it == "c") "B2" else "B1" }
+            floorEstimator.floorKey?.let { when (it) { "a" -> "B2"; "b" -> "1층"; else -> "B1" } }
         } else null
         val floorText = estimatedFloor?.let { " · $it 층 추정" } ?: " · 층 확인 필요"
         val time = SimpleDateFormat("yyyy.MM.dd HH:mm", Locale.KOREA).format(Date(now))
