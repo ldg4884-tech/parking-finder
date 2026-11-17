@@ -260,8 +260,7 @@ class CarBluetoothMonitorService : Service(), SensorEventListener {
         if (best.score < 0.70 || best.matched < 3 || best.samples < 3 || margin < 0.12) return false
 
         val floorName = when (best.mapKey) { "a" -> "B2"; "b" -> "1층"; else -> "B1" }
-        val mapName = floorName
-        val spot = "자동 추정: $floorName · $mapName · 지도상 ${best.slot + 1}번 주차면"
+        val spot = "자동 추정: $floorName · 지도상 ${best.slot + 1}번 주차면"
         val time = SimpleDateFormat("yyyy.MM.dd HH:mm", Locale.KOREA).format(Date())
         val history = (prefs.getStringSet("parking_history", emptySet()) ?: emptySet()).toMutableSet()
         history.add("$time  |  $spot  |  차량 블루투스 해제 후 Wi-Fi 자동 추정")
@@ -326,7 +325,7 @@ class CarBluetoothMonitorService : Service(), SensorEventListener {
         val estimatedFloor = if (floorEstimator.underground) {
             floorEstimator.floorKey?.let { when (it) { "a" -> "B2"; "b" -> "1층"; else -> "B1" } }
         } else null
-        val floorText = estimatedFloor?.let { " · $it 층 추정" } ?: " · 층 확인 필요"
+        val floorText = estimatedFloor?.let { " · $it 추정" } ?: " · 층 확인 필요"
         val time = SimpleDateFormat("yyyy.MM.dd HH:mm", Locale.KOREA).format(Date(now))
         val location = candidates.maxByOrNull { it.time }
         val ageMinutes = location?.let { ((now - it.time).coerceAtLeast(0L) / 60000L) }
