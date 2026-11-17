@@ -18,9 +18,9 @@ class FloorEstimator(
 ) {
     companion object {
         val DEFAULT_FLOORS = listOf(
-            FloorDef("a", "지하1층-1", 21.5),
-            FloorDef("b", "지하1층-2", 31.5),
-            FloorDef("c", "지하2층", 26.7)
+            FloorDef("a", "지하2층", 21.5),
+            FloorDef("b", "지상1층", 31.5),
+            FloorDef("c", "지하1층", 26.7)
         )
         const val GOOD_ACCURACY_M = 25f
         const val LOST_AFTER_MS = 8_000L
